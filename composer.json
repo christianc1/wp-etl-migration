@@ -1,0 +1,50 @@
+{
+  "name": "christianc1/wp-etl-migration",
+  "type": "package",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "10up",
+      "email": "info@10up.com"
+    },
+    {
+      "name": "Christian Chung",
+      "email": "christian.chung@10up.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.0",
+    "composer/installers": "^2.2.0",
+    "haydenpierce/class-finder": "^0.4.3",
+    "flow-php/etl": "1.x-dev",
+    "symfony/yaml": "^7.2",
+    "symfony/property-access": "^7.2",
+    "symfony/config": "^7.2",
+    "flow-php/etl-adapter-csv": "^0.10.0",
+    "flow-php/etl-adapter-json": "^0.10.0",
+    "flow-php/etl-adapter-xml": "^0.10.0",
+    "symfony/uid": "^7.2",
+    "symfony/dom-crawler": "^7.2",
+    "symfony/html-sanitizer": "^7.2",
+    "symfony/css-selector": "^7.2"
+  },
+  "require-dev": {
+    "10up/phpcs-composer": "^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Flow\\ETL\\Adapter\\WordPress\\": "lib/Flow/ETL/Adapter/WordPress/",
+      "TenupETL\\": "lib/"
+    },
+    "files": [
+      "lib/functions.php",
+      "lib/Flow/ETL/Adapter/WordPress/functions.php"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  }
+}

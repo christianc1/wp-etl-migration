@@ -1,0 +1,29 @@
+node_modules/
+dist/
+vendor/
+
+# Plugins
+
+# Editors
+*.esproj
+*.tmproj
+*.tmproject
+tmtags
+.*.sw[a-z]
+*.un~
+Session.vim
+*.swp
+.vscode/launch.json
+tasks.json
+cursorrules
+
+# Mac OSX
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Desktop.ini
+/debug.log
