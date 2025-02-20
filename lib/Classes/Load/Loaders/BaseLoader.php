@@ -90,7 +90,12 @@ class BaseLoader implements Loader {
 	 * @param string $prefix Prefix to filter on.
 	 * @return array Filtered array of values.
 	 */
-	protected function reduce_row_on_prefix( Row $row, string $prefix, bool $unpack = false, string $unpack_delimiter = '.' ): array {
+	protected function reduce_row_on_prefix(
+		Row $row,
+		string $prefix,
+		bool $unpack = false,
+		string $unpack_delimiter = '.'
+	): array {
 		// Ensure prefix has a trailing dot
 		$prefix = rtrim( $prefix, '.' ) . '.';
 

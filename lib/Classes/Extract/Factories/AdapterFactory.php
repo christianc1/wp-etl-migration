@@ -11,6 +11,7 @@ use TenupETL\Classes\Extract\Extractors\LocalFileSystemExtractor;
 use TenupETL\Utils\WithLogging;
 use function Flow\ETL\Adapter\CSV\from_csv;
 use function Flow\ETL\Adapter\XML\from_xml;
+use function Flow\ETL\Adapter\JSON\from_json;
 use function Flow\ETL\Adapter\WordPress\{from_wp_posts, from_wp_terms, from_wp_users};
 
 /**
@@ -154,11 +155,14 @@ class AdapterFactory {
 			$this->log( 'No XML file found in extraction configuration', 'error' );
 			return null;
 		}
+
+		$nodePath = $extraction['args']['xmlNodePath'] ?? 'rss/channel/item';
+
 		$adapter = from_xml( $file->getRealPath() );
 
 		// Configure XML node path if specified
-		if ( ! empty( $extraction['args']['xmlNodePath'] ) ) {
-			$adapter = $adapter->withXMLNodePath( 'rss/channel/item' );
+		if ( $nodePath ) {
+			$adapter = $adapter->withXMLNodePath( $nodePath );
 		}
 
 		return $adapter;

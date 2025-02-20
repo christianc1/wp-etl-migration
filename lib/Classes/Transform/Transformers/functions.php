@@ -34,6 +34,27 @@ function rename_regex( string $pattern, string $replacement ): Transformer {
 }
 
 /**
+ * Creates a transformer that converts a string to null.
+ *
+ * @param string $string The string to convert to null.
+ * @return Transformer The string to null transformer.
+ */
+function string_to_null( string $string ): Transformer {
+	return new StringToNullTransformer( $string );
+}
+
+/**
+ * Creates a transformer that selects entries with a given prefix.
+ *
+ * @param string  $prefix        The prefix to select entries with.
+ * @param boolean $remove_prefix Whether to remove the prefix from the entries.
+ * @return Transformer The select prefix transformer.
+ */
+function select_prefix( string $prefix, bool $remove_prefix = false ): Transformer {
+	return new SelectPrefixTransformer( $prefix, $remove_prefix );
+}
+
+/**
  * Creates a simple transformer from a callable function.
  *
  * @param callable $call The function to use for transformation.
@@ -53,4 +74,25 @@ function simple_transformer( callable $call, array $args = [] ): ScalarFunction 
  */
 function to_slug( mixed $ref, ScalarFunction|string $prefix = '' ): ScalarFunction {
 	return new ToSlug( $ref, $prefix );
+}
+
+/**
+ * Creates an explode transformer.
+ *
+ * @param ScalarFunction|string $delimeter The delimeter to explode the string by.
+ * @param ScalarFunction|string $ref       The reference to the string to explode.
+ * @return ScalarFunction The explode transformer.
+ */
+function to_explode( ScalarFunction|string $delimeter = ',', ScalarFunction|string $ref, ): ScalarFunction {
+	return new Explode( $ref, $delimeter );
+}
+
+/**
+ * Creates a compare set null transformer.
+ *
+ * @param mixed                 $ref The reference to the value to compare.
+ * @param ScalarFunction|string $compare_value The value to compare against.
+ */
+function compare_set_null( mixed $ref, ScalarFunction|string $compare_value ): ScalarFunction {
+	return new CompareSetNull( $ref, $compare_value );
 }

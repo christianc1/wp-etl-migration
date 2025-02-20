@@ -11,6 +11,8 @@
 namespace TenupETL\Classes\Load\Loaders;
 
 use TenupETL\Utils\WithLogging;
+
+use function TenupETL\Classes\Transform\Transformers\select_prefix;
 use function Flow\ETL\Adapter\JSON\{to_json};
 
 /**
@@ -53,6 +55,10 @@ class JsonLoader extends BaseLoader {
 			foreach ( $this->step_config['options']['flags'] as $flag ) {
 				$flags |= constant( $flag );
 			}
+		}
+
+		if ( $this->step_config['prefix'] ) {
+			$state = $state->transform( select_prefix( $this->step_config['prefix'], true ) );
 		}
 
 		try {

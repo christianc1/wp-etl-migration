@@ -48,7 +48,7 @@ class WordPressPostLoader extends BaseLoader implements Loader {
 	public function load( Rows $rows, FlowContext $context ): void {
 		foreach ( $rows as $row ) {
 			$post_arr  = $this->reduce_row_on_prefix( $row, 'post' );
-			$post_meta = $this->reduce_row_on_prefix( $row, 'meta' );
+			$post_meta = $this->reduce_row_on_prefix( $row, 'meta', true );
 			$tax_terms = $this->reduce_row_on_prefix( $row, 'tax' );
 			$ledger    = $this->reduce_row_on_prefix( $row, 'ledger' );
 
@@ -64,10 +64,18 @@ class WordPressPostLoader extends BaseLoader implements Loader {
 				$post_arr['post_content'] = $post_arr['post_content']->saveHTML();
 			}
 
-			$post_id = wp_insert_post( $post_arr );
+			$post_id = wp_insert_post( $post_arr, true );
+
+			if ( is_wp_error( $post_id ) || 0 === $post_id ) {
+				$this->log( 'Error inserting post: ' . $post_arr['post_title'], 'warning' );
+				if ( is_wp_error( $post_id ) ) {
+					$this->log( $post_id->get_error_message(), 'warning' );
+				}
+				continue;
+			}
 
 			// Handle thumbnail
-			if ( $post_meta['_remote_featured_media'] ) {
+			if ( isset( $post_meta['_remote_featured_media'] ) && $post_meta['_remote_featured_media'] ) {
 				$attachment_id = $this->sideload_media( $post_meta['_remote_featured_media'], $post_id );
 
 				if ( ! is_wp_error( $attachment_id ) ) {
@@ -79,7 +87,12 @@ class WordPressPostLoader extends BaseLoader implements Loader {
 
 			// Handle the meta.
 			foreach ( $post_meta as $meta_key => $meta_value ) {
-				update_post_meta( $post_id, $meta_key, $meta_value );
+
+				if ( is_array( $meta_value ) ) {
+					$meta_value = json_decode( wp_json_encode( $meta_value ), true );
+				}
+
+				$updated = update_post_meta( $post_id, $meta_key, $meta_value );
 			}
 
 			// Handle the terms

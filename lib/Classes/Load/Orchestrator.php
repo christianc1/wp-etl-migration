@@ -129,6 +129,7 @@ class Orchestrator {
 
 		return match ( strtolower( $loader ) ) {
 			'json' => new Loaders\JsonLoader( $load_operation, $this->config ),
+			'csv' => new Loaders\CSVLoader( $load_operation, $this->config ),
 			'wp_post' => new Loaders\WordPressPostLoader( $load_operation, $this->config ),
 			'wp_media' => new Loaders\WordPressMediaLoader( $load_operation, $this->config ),
 			'wp_term' => new Loaders\WordPressTermLoader( $load_operation, $this->config ),

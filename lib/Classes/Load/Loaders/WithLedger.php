@@ -98,7 +98,7 @@ trait WithLedger {
 			->write(
 				to_json(
 					$destination,
-				)->withFlags( JSON_PRETTY_PRINT )
+				)->withFlags( JSON_PRETTY_PRINT, JSON_INVALID_UTF8_SUBSTITUTE )
 			)
 			->run();
 	}

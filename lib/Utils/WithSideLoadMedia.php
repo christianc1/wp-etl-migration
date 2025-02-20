@@ -17,20 +17,22 @@ trait WithSideLoadMedia {
 	 * @return int|WP_Error    Attachment ID on success, WP_Error on failure
 	 */
 	protected function sideload_media( $file_url, $post_id = 0 ) {
-		$filename = basename( $file_url );
+		$filename = pathinfo($filename, PATHINFO_FILENAME);
 
 		// Check if file already exists in media library
-		$existing_attachment = get_posts(
-			array(
-				'post_type'      => 'attachment',
-				'posts_per_page' => 1,
-				'title'          => $filename,
-				'fields'         => 'ids',
-			)
-		);
+		for ( $i = 0; $i < 3; $i++ ) {
+			$existing_attachment = get_posts(
+				array(
+					'post_type'      => 'attachment',
+					'posts_per_page' => 1,
+					'title'          => $filename . ( $i ? '-' . $i : ''),
+					'fields'         => 'ids',
+				)
+			);
 
-		if ( ! empty( $existing_attachment ) ) {
-			return $existing_attachment[0];
+			if ( ! empty( $existing_attachment ) ) {
+				return $existing_attachment[0];
+			}
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/file.php';

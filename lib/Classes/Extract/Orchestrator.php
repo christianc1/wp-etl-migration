@@ -122,8 +122,12 @@ class Orchestrator {
 			$this->extract_from_source( $extraction );
 		}
 
-		$this->state = $this->normalizer->normalize( $this->state );
-		$this->state = $this->normalizer->prefix( $this->state, $extraction['prefix'] );
+		$normalize = $extraction['normalize'] ?? true;
+
+		if ( $normalize ) {
+			$this->state = $this->normalizer->normalize( $this->state );
+			$this->state = $this->normalizer->prefix( $this->state, $extraction['prefix'] );
+		}
 
 		$configured_pipeline = $extraction['pipeline'];
 
