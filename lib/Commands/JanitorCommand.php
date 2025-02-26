@@ -178,7 +178,8 @@ class JanitorCommand extends BaseCommand {
 		);
 
 		if ( empty( $_terms_ids ) ) {
-			WP_CLI::error( 'No terms found.' );
+			WP_CLI::warning( 'No terms found.' );
+			return;
 		}
 
 		WP_CLI::confirm( sprintf( 'Are you sure you want to delete %d terms?', count( $_terms_ids ) ), $assoc_args );

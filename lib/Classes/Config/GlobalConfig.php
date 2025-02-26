@@ -125,4 +125,10 @@ class GlobalConfig extends FileLoader {
 	public function get_config(): array {
 		return $this->config;
 	}
+
+	public function update_config( array $config ): GlobalConfig {
+		$this->config = array_merge( $this->config, $config );
+
+		return $this;
+	}
 }

@@ -17,7 +17,7 @@ trait WithSideLoadMedia {
 	 * @return int|WP_Error    Attachment ID on success, WP_Error on failure
 	 */
 	protected function sideload_media( $file_url, $post_id = 0 ) {
-		$filename = pathinfo($filename, PATHINFO_FILENAME);
+		$filename = pathinfo($file_url, PATHINFO_FILENAME);
 
 		// Check if file already exists in media library
 		for ( $i = 0; $i < 3; $i++ ) {

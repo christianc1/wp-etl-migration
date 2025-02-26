@@ -12,14 +12,14 @@ namespace TenupETL\Classes\Load\Loaders;
 use TenupETL\Classes\Config\GlobalConfig;
 use TenupETL\Utils\WithLogging;
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
+use Flow\ETL\Loader\Closure;
 use Flow\DSL\{data_frame};
 
 /**
  * Base loader class that implements core loader functionality.
  */
-class BaseLoader implements Loader {
+class BaseLoader implements Loader, Closure {
 	use WithLogging;
-	use WithLedger;
 
 	/**
 	 * Name of the loader
@@ -36,19 +36,25 @@ class BaseLoader implements Loader {
 	public $config;
 
 	/**
+	 * Unique identifier for the load operation
+	 *
+	 * @var string
+	 */
+	public $uid;
+
+	/**
 	 * Constructor
 	 *
 	 * @param array        $step_config   Configuration for this load step.
 	 * @param GlobalConfig $global_config Global configuration.
 	 */
-	public function __construct( protected array $step_config, protected GlobalConfig $global_config ) {
-		$this->config = $step_config;
-		$this->name   = $step_config['name'];
-		$this->uid    = time();
-
-		if ( isset( $this->step_config['ledger'] ) ) {
-			$this->ledger = [];
-		}
+	public function __construct(
+		protected array $step_config,
+		protected GlobalConfig $global_config,
+	) {
+		$this->config      = $step_config;
+		$this->name        = $step_config['name'];
+		$this->uid         = time();
 	}
 
 	/**
@@ -81,7 +87,21 @@ class BaseLoader implements Loader {
 	 * @param FlowContext $context Flow context.
 	 * @return void
 	 */
-	public function load( Rows $rows, FlowContext $context ): void {}
+	public function load( Rows $rows, FlowContext $context ): void {
+		$this->loaded_rows = $rows;
+	}
+
+	/**
+	 * Closure method for the loader
+	 *
+	 * Called after the generator signals all rows have been yielded.
+	 *
+	 * @param FlowContext $context Flow context.
+	 * @return void
+	 */
+	public function closure( FlowContext $context ): void {
+		$this->loaded_rows = null;
+	}
 
 	/**
 	 * Reduce a row to only fields with a given prefix
@@ -150,14 +170,5 @@ class BaseLoader implements Loader {
 		}
 
 		$this->unpack_recursive( $array[ $key ], $keys, $value );
-	}
-
-	/**
-	 * Check if loader has a ledger
-	 *
-	 * @return bool True if loader has ledger property and it's truthy.
-	 */
-	public function has_ledger() {
-		return property_exists( $this, 'ledger' ) && (bool) $this->ledger;
 	}
 }

@@ -130,6 +130,7 @@ class WordPressPostPipeline extends BaseTransformationPipeline {
 			->post_excerpt()
 			->post_date()
 			->post_modified()
+			->attachments()
 			->etl_post_meta()
 			->post_meta()
 			->ledger_records()
@@ -253,6 +254,15 @@ class WordPressPostPipeline extends BaseTransformationPipeline {
 		$this->state
 			->withEntry( $this->core( 'post_modified_date' ), now() );
 
+		return $this;
+	}
+
+	/**
+	 * Isolates attachments that should be sideloaded.
+	 *
+	 * @return TransformationPipeline
+	 */
+	protected function attachments(): TransformationPipeline {
 		return $this;
 	}
 

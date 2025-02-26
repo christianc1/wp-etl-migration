@@ -8,13 +8,18 @@ use function Flow\ETL\DSL\{row, rows, str_entry};
 use Flow\ETL\Row\{Reference, References};
 use Flow\ETL\{FlowContext, Rows, Row, Transformer};
 
-final readonly class SelectPrefixTransformer implements Transformer {
+final class SelectPrefixTransformer implements Transformer {
    /**
 	 * Constructor.
 	 *
-	 * @param string $prefix The prefix to add to entry names.
+	 * @param string|string[] $prefix The prefix to add to entry names.
 	 */
-	public function __construct( private readonly string $prefix, private readonly bool $remove_prefix = false ) {}
+	public function __construct(
+		protected string | array $prefix,
+		protected readonly bool $remove_prefix = false )
+	{
+		$this->prefix = is_array( $prefix ) ? $prefix : [ $prefix ];
+	}
 
 	/**
 	 * Transforms rows by adding a prefix to all entry names.
@@ -31,14 +36,29 @@ final readonly class SelectPrefixTransformer implements Transformer {
 					$names[] = $entry->name();
 				}
 
-				// Remove any entries that start with the prefix.
-				$names = array_filter( $names, fn( $name ) => ! ( strpos( $name, $this->prefix ) === 0 ) );
+				// Remove any entries that don't start with the prefix.
+				$names = array_filter(
+					$names,
+					function($name) {
+						foreach ($this->prefix as $prefix) {
+							if (strpos($name, $prefix) === 0) {
+								return false;
+							}
+						}
+						return true;
+					}
+				);
+
 				$row   = $row->remove( ...$names );
 
 				// Remove the prefix from the entries, if $remove_prefix is true.
 				if ( $this->remove_prefix ) {
 					foreach ( $row->entries()->all() as $entry ) {
-						$row = $row->rename( $entry->name(), str_replace( $this->prefix, '', $entry->name() ) );
+						foreach ( $this->prefix as $prefix ) {
+							if ( strpos( $entry->name(), $prefix ) === 0 ) {
+								$row = $row->rename( $entry->name(), str_replace( $prefix, '', $entry->name() ) );
+							}
+						}
 					}
 				}
 

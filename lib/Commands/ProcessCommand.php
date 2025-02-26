@@ -47,11 +47,14 @@ class ProcessCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
-	 * [--type=<type>]
-	 * : Only process specific migration type(s), comma separated
+	 * [<jobs>]
+	 * : Migration jobs to process
 	 *
-	 * [--skip=<type>]
-	 * : Skip specific migration type(s), comma separated
+	 * [--jobs=<jobs>]
+	 * : Migration jobs to process
+	 *
+	 * [--skip=<jobs>]
+	 * : Skip specific migration jobs, comma separated
 	 *
 	 * [--debug]
 	 * : Enable verbose debug output
@@ -69,7 +72,7 @@ class ProcessCommand extends BaseCommand {
 	 * : Skip confirmation prompts
 	 *
 	 * ## EXAMPLES
-	 *
+	 *     wp etl process articles
 	 *     wp etl process --type=articles,media
 	 *     wp etl process --skip=users --debug
 	 *     wp etl process --dry-run
@@ -78,8 +81,10 @@ class ProcessCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments.
 	 * @return void
 	 */
-	public function process( $args, $assoc_args ) {
-		$type              = \WP_CLI\Utils\get_flag_value( $assoc_args, 'type', null );
+	public function __invoke( $args, $assoc_args ) {
+		// Check for positional argument first, then fall back to --jobs flag
+		$jobs = !empty($args[0]) ? $args[0] : \WP_CLI\Utils\get_flag_value( $assoc_args, 'jobs', null );
+
 		$skip              = \WP_CLI\Utils\get_flag_value( $assoc_args, 'skip', null );
 		$debug             = \WP_CLI\Utils\get_flag_value( $assoc_args, 'debug', false );
 		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
@@ -88,7 +93,7 @@ class ProcessCommand extends BaseCommand {
 
 		try {
 			// Parse types to process/skip.
-			$process_types = $type ? array_map( 'trim', explode( ',', $type ) ) : [];
+			$process_types = $jobs ? array_map( 'trim', explode( ',', $jobs ) ) : [];
 			$skip_types    = $skip ? array_map( 'trim', explode( ',', $skip ) ) : [];
 
 			// Filter config based on type/skip parameters.
@@ -210,10 +215,14 @@ class ProcessCommand extends BaseCommand {
 	 * @return array Filtered configuration.
 	 */
 	protected function filter_migration_config( array $process_types, array $skip_types ): array {
-		$config = $this->config->get_value( 'migration' );
+		if ( empty( $process_types ) && empty( $skip_types ) ) {
+			return $this->config->get_value( 'migration' );
+		}
 
-		return array_filter(
-			$config,
+		$migrations = $this->config->get_value( 'migration' );
+
+		$filtered_migrations = array_filter(
+			$migrations,
 			function ( $job ) use ( $process_types, $skip_types ) {
 				// Skip if explicitly marked to skip in config.
 				if ( ! empty( $job['skip'] ) ) {
@@ -229,6 +238,10 @@ class ProcessCommand extends BaseCommand {
 				return empty( $process_types ) || in_array( $job['name'], $process_types, true );
 			}
 		);
+
+		$this->config->update_config( [ 'migration' => $filtered_migrations ] );
+
+		return $filtered_migrations;
 	}
 
 	/**
@@ -388,7 +401,7 @@ class ProcessCommand extends BaseCommand {
 	 * @return void
 	 */
 	public function analyze( $args, $assoc_args ) {
-		$type  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'type', null );
+		$jobs  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'type', null );
 		$force = \WP_CLI\Utils\get_flag_value( $assoc_args, 'force', false );
 
 		if ( ! $force ) {
@@ -403,7 +416,7 @@ class ProcessCommand extends BaseCommand {
 		try {
 			// Filter jobs based on type if specified.
 			$jobs = $this->filter_migration_config(
-				$type ? [ $type ] : [],
+				$jobs ? [ $jobs ] : [],
 				[]
 			);
 
@@ -483,24 +496,24 @@ class ProcessCommand extends BaseCommand {
 	/**
 	 * Show migration progress.
 	 *
-	 * @param string $type    Migration type.
+	 * @param string $jobs    Migration type.
 	 * @param int    $current Current progress.
 	 * @return void
 	 */
-	protected function show_progress( $type, $current ) {
+	protected function show_progress( $jobs, $current ) {
 		static $progress;
 		static $total;
 
 		if ( ! $progress ) {
 			$manifest = get_option( $this->config->get_value( 'slug' ) . '_migration_manifest', [] );
-			if ( empty( $manifest ) || ! isset( $manifest[ $type ] ) ) {
+			if ( empty( $manifest ) || ! isset( $manifest[ $jobs ] ) ) {
 				WP_CLI::warning( "No manifest found. Run 'wp etl analyze' first for progress reporting." );
 				return;
 			}
 
-			$total    = $manifest[ $type ]['count'];
+			$total    = $manifest[ $jobs ]['count'];
 			$progress = \WP_CLI\Utils\make_progress_bar(
-				"Processing {$type}",
+				"Processing {$jobs}",
 				$total
 			);
 		}

@@ -12,16 +12,38 @@ namespace TenupETL\Classes\Load\Loaders;
 use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 
 use Flow\ETL\{FlowContext, Loader, Rows};
+use function Flow\ETL\DSL\{integer_entry, rows_to_array};
+use TenupETL\Classes\Config\GlobalConfig;
+use Flow\ETL\Adapter\WordPress\{WPPostsLoader, WPPostMetaLoader};
 
 /**
  * Class WordPressPostLoader
  *
  * Handles loading posts into WordPress during ETL process.
  */
-class WordPressPostLoader extends BaseLoader implements Loader {
+class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 	use WithLogging;
 	use WithSideLoadMedia;
-	use WithLedger;
+	use WithRowMutation;
+
+	/**
+	 * The adapter to use for loading posts
+	 *
+	 * @var WPPostsLoader
+	 */
+	protected $adapter;
+
+	public function __construct(
+		protected array $step_config,
+		protected GlobalConfig $global_config,
+	) {
+		parent::__construct( $step_config, $global_config );
+
+		$this->posts_adapter = new WPPostsLoader( $step_config['args'] ?? [] );
+		$this->posts_adapter->withDateTimeFormat( 'Y-m-d H:i:s' );
+
+		$this->meta_adapter = new WPPostMetaLoader( $step_config['args'] ?? [] );
+	}
 
 	/**
 	 * Run the loader
@@ -46,33 +68,19 @@ class WordPressPostLoader extends BaseLoader implements Loader {
 	 * @return void
 	 */
 	public function load( Rows $rows, FlowContext $context ): void {
+		$normalizer = $this->posts_adapter->create_normalizer( $context );
+
 		foreach ( $rows as $row ) {
-			$post_arr  = $this->reduce_row_on_prefix( $row, 'post' );
-			$post_meta = $this->reduce_row_on_prefix( $row, 'meta', true );
-			$tax_terms = $this->reduce_row_on_prefix( $row, 'tax' );
-			$ledger    = $this->reduce_row_on_prefix( $row, 'ledger' );
-
-			// Cast DateTime to String
-			$post_arr = array_map(
-				function ( $value ) {
-					return $value instanceof \DateTimeInterface ? $value->format( 'Y-m-d H:i:s' ) : $value;
-				},
-				$post_arr
-			);
-
-			if ( $post_arr['post_content'] instanceof \DomDocument ) {
-				$post_arr['post_content'] = $post_arr['post_content']->saveHTML();
-			}
-
-			$post_id = wp_insert_post( $post_arr, true );
-
-			if ( is_wp_error( $post_id ) || 0 === $post_id ) {
-				$this->log( 'Error inserting post: ' . $post_arr['post_title'], 'warning' );
-				if ( is_wp_error( $post_id ) ) {
-					$this->log( $post_id->get_error_message(), 'warning' );
-				}
+			try {
+				$post_id = $this->posts_adapter->insertPost( $row, normalizer: $normalizer );
+			} catch ( \Exception $e ) {
+				$this->log( 'Error inserting post: ' . $row->valueOf( 'post.post_title' ), 'warning' );
+				$this->log( $e->getMessage(), 'warning' );
 				continue;
 			}
+
+			// Add post_id to the row
+			$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $post_id ) ) );
 
 			// Handle thumbnail
 			if ( isset( $post_meta['_remote_featured_media'] ) && $post_meta['_remote_featured_media'] ) {
@@ -80,40 +88,10 @@ class WordPressPostLoader extends BaseLoader implements Loader {
 
 				if ( ! is_wp_error( $attachment_id ) ) {
 					set_post_thumbnail( $post_id, $attachment_id );
-				}
-
-				unset( $post_meta['_remote_featured_media'] );
-			}
-
-			// Handle the meta.
-			foreach ( $post_meta as $meta_key => $meta_value ) {
-
-				if ( is_array( $meta_value ) ) {
-					$meta_value = json_decode( wp_json_encode( $meta_value ), true );
-				}
-
-				$updated = update_post_meta( $post_id, $meta_key, $meta_value );
-			}
-
-			// Handle the terms
-			if ( ! empty( $tax_terms ) ) {
-				foreach ( $tax_terms as $taxonomy => $term_slugs ) {
-					wp_set_object_terms( $post_id, $term_slugs, $taxonomy, true );
+					$row = $this->mutate_row( $row->add( integer_entry( 'post.featured_media', $attachment_id ) ) );
 				}
 			}
-
-			// Create a ledger entry
-			$this->create_ledger_entry(
-				array_merge(
-					[
-						'post_id' => $post_id,
-						'uid'     => $row->valueOf( 'etl.uid' ),
-					],
-					$ledger
-				)
-			);
-			do_action( 'tenup_etl_row_processed', 1 );
-			$this->log( 'Loaded WP_Post ' . $post_id, 'progress' );
+			$this->log( 'Loaded ' . $row->valueOf( 'post.post_title' ) . ' as WP_Post ' . $post_id, 'progress' );
 		}
 	}
 }
