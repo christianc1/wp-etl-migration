@@ -16,6 +16,7 @@ use TenupETL\Classes\Load\LedgerRegistry;
 use TenupETL\Classes\Load\Loaders;
 use Flow\ETL\Join\{Join, Expression};
 use Flow\ETL\{DataFrame, Rows, FlowContext};
+use Flow\ETL\Filesystem\SaveMode;
 
 use function Flow\ETL\Adapter\CSV\from_csv;
 use function Flow\ETL\DSL\{data_frame, from_array, to_array, to_output, to_stream, uuid_v4};
@@ -84,6 +85,9 @@ class Orchestrator {
 			->withEntry( 'etl.uid', uuid_v4() );
 
 		$this->get_current_state()
+			// We can set the mode to overwrite here because each step config sets this individually (default false).
+			// This just allows all those steps that set overwrite: true to actually overwrite the file.
+			->mode( SaveMode::Overwrite )
 			->write( $this->get_synchronous_loader() );
 
 		// Run the pipeline.
@@ -95,7 +99,26 @@ class Orchestrator {
 
 	public function get_synchronous_loader() {
 		$loaders = [];
+		$all     = false;
 		foreach ( $this->step_config as $load_operation ) {
+			// Often when loading posts, you want to run post, media, meta, and terms all at once.
+			// This is a helper function to do that.
+			$all_loaders = [ 'WP_Post', 'WP_Post_Media', 'WP_Post_Meta', 'WP_Post_Terms' ];
+
+			if ( $load_operation['loader'] === 'WP_Post_All' ) {
+				$all = true;
+				foreach ( $all_loaders as $loader ) {
+					$load_operation['loader'] = $loader;
+					array_push( $loaders, $this->adapter_factory->create( $load_operation ) );
+				}
+				continue;
+			}
+
+			// If we're loading all loaders, don't add any included loaders twice.
+			if ( $all && in_array( $load_operation['loader'], $all_loaders, true )) {
+				continue;
+			}
+
 			array_push( $loaders, $this->adapter_factory->create( $load_operation ) );
 		}
 

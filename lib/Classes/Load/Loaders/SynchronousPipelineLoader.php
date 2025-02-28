@@ -13,11 +13,13 @@ use Flow\ETL\{DataFrame};
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Loader\Closure;
 use Flow\DSL\{data_frame};
+use Flow\ETL\Adapter\WordPress\Exception\WPAdapterDatabaseException;
 
 /**
  * Synchronous loader class that runs multiple loaders in order, passing mutable rows through the loader chain.
  */
 final class SynchronousPipelineLoader implements Loader, Closure {
+	use WithLogging;
 
 	/**
 	 * Constructor
@@ -37,7 +39,13 @@ final class SynchronousPipelineLoader implements Loader, Closure {
 	 */
 	public function load( Rows $rows, FlowContext $context ): void {
 		foreach ( $this->loaders as $loader ) {
-			$loader->load( $rows, $context );
+			try {
+				$loader->load( $rows, $context );
+			} catch ( WPAdapterDatabaseException $e ) {
+				$this->log( $e->getMessage(), 'warning' );
+			} catch ( \Exception $e ) {
+				error_log( $e->getMessage() );
+			}
 
 			if ( $loader instanceof RowMutator && $loader->has_mutated_rows() ) {
 				$rows = $loader->collect_mutated_rows();

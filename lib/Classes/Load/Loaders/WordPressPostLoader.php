@@ -14,7 +14,7 @@ use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 use Flow\ETL\{FlowContext, Loader, Rows};
 use function Flow\ETL\DSL\{integer_entry, rows_to_array};
 use TenupETL\Classes\Config\GlobalConfig;
-use Flow\ETL\Adapter\WordPress\{WPPostsLoader, WPPostMetaLoader};
+use Flow\ETL\Adapter\WordPress\Loaders\{WPPostsLoader, WPPostMetaLoader};
 
 /**
  * Class WordPressPostLoader
@@ -41,8 +41,6 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 
 		$this->posts_adapter = new WPPostsLoader( $step_config['args'] ?? [] );
 		$this->posts_adapter->withDateTimeFormat( 'Y-m-d H:i:s' );
-
-		$this->meta_adapter = new WPPostMetaLoader( $step_config['args'] ?? [] );
 	}
 
 	/**

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\WordPress;
+namespace Flow\ETL\Adapter\WordPress\Normalizers;
 
 use Flow\ETL\Row\Entry;
 use Flow\ETL\Rows;
-use Flow\ETL\Adapter\WordPress\RowsNormalizer\EntryNormalizer;
+use Flow\ETL\Adapter\WordPress\Normalizers\EntryNormalizer;
 
 final class RowsNormalizer
 {

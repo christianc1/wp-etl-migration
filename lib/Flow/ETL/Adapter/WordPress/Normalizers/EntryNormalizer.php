@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\WordPress\RowsNormalizer;
+namespace Flow\ETL\Adapter\WordPress\Normalizers;
 
 use Flow\ETL\Row\Entry;
 use Flow\ETL\PHP\Type\Caster;

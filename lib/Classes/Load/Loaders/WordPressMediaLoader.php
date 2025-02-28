@@ -13,7 +13,7 @@ use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use function Flow\ETL\DSL\{integer_entry, string_entry, rows_to_array};
 use TenupETL\Classes\Config\GlobalConfig;
-use Flow\ETL\Adapter\WordPress\{WPPostsLoader, WPPostMetaLoader, WPMediaLoader};
+use Flow\ETL\Adapter\WordPress\Loaders\{WPPostsLoader, WPPostMetaLoader, WPMediaLoader};
 
 /**
  * Class WordPressMediaLoader

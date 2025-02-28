@@ -157,6 +157,14 @@ class BaseLoader implements Loader, Closure {
 		return $result;
 	}
 
+	/**
+	 * Unpack a nested array recursively
+	 *
+	 * @param array &$array The array to unpack.
+	 * @param array $keys The keys to unpack.
+	 * @param mixed $value The value to unpack.
+	 * @return void
+	 */
 	public function unpack_recursive( array &$array, array $keys, $value ) {
 		$key = array_shift( $keys );
 

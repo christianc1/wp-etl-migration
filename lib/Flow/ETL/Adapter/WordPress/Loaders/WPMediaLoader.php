@@ -2,9 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\WordPress;
+namespace Flow\ETL\Adapter\WordPress\Loaders;
 
-use Flow\ETL\Adapter\WordPress\RowsNormalizer\EntryNormalizer;
+use Flow\ETL\Adapter\WordPress\Exception\{
+	WPAdapterDatabaseException,
+	WPAdapterDataException,
+	WPAdapterMissingDataException
+};
+use Flow\ETL\Adapter\WordPress\Normalizers\{
+    EntryNormalizer,
+    RowNormalizer
+};
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Exception\RuntimeException;
 use Flow\ETL\Row\Entry;
@@ -31,7 +39,7 @@ final class WPMediaLoader implements Loader
     public function load(Rows $rows, FlowContext $context): void
     {
         if (!$rows->count()) {
-            return;
+            throw WPAdapterMissingDataException::noEntitiesFound('media', 'No media found to process');
         }
 
         $normalizer = $this->create_normalizer($context);
@@ -59,7 +67,9 @@ final class WPMediaLoader implements Loader
 
         $media_groups = $this->groupMediaFields($data);
         if (empty($media_groups)) {
-            return [];
+            throw WPAdapterMissingDataException::noEntitiesFound('media_fields', 'No media fields found in the data', [
+                'available_keys' => array_keys($data)
+            ]);
         }
 
         $results = [];
@@ -77,6 +87,12 @@ final class WPMediaLoader implements Loader
                 // Log error but continue processing other media
                 error_log("Failed to process media {$media_key}: " . $e->getMessage());
             }
+        }
+
+        if (empty($results)) {
+            throw WPAdapterMissingDataException::noEntitiesFound('media', 'No media was successfully processed', [
+                'media_groups' => array_keys($media_groups)
+            ]);
         }
 
         return $results;
@@ -113,6 +129,10 @@ final class WPMediaLoader implements Loader
      */
     protected function sideloadSingleMedia(array $media_data): int
     {
+        if (empty($media_data['url'])) {
+            throw WPAdapterDataException::missingRequiredData('url', $media_data);
+        }
+
         $url = $media_data['url'];
         $desc = $media_data['title'] ?? null;
         $post_parent = !empty($media_data['post_parent']) ? (int)$media_data['post_parent'] : 0;
@@ -129,7 +149,7 @@ final class WPMediaLoader implements Loader
         $attachment_id = $this->sideloadMedia($url, $post_parent, $desc, $post_data);
 
         if (is_wp_error($attachment_id)) {
-            throw new RuntimeException("Failed to sideload media: " . $attachment_id->get_error_message());
+            throw WPAdapterDatabaseException::fromWPError($attachment_id, "Failed to sideload media");
         }
 
         // Update alt text if provided
