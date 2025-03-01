@@ -17,46 +17,89 @@ use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Exception\RuntimeException;
 use Flow\ETL\Row\Entry;
 
+/**
+ * WordPress Posts Loader for ETL operations
+ *
+ * This loader handles the insertion and updating of WordPress posts during ETL processes.
+ * It supports data normalization, sanitization, and proper error handling for post operations.
+ *
+ * @implements Loader
+ */
 final class WPPostsLoader implements Loader
 {
+    /**
+     * @var string The format to use for datetime values
+     */
     private string $dateTimeFormat = \DateTimeInterface::ATOM;
+
+    /**
+     * @var array<string, mixed> Default values for post fields
+     */
     private array $postDefaults = [
         'post_status' => 'draft',
         'post_type' => 'post',
         'post_author' => 1,
     ];
 
+    /**
+     * Constructor
+     *
+     * @param array<string, mixed> $config Configuration array for the loader
+     */
     public function __construct(
         private readonly array $config = []
     ) {
         $this->postDefaults = array_merge($this->postDefaults, $config['defaults'] ?? []);
     }
 
-	public function create_normalizer( FlowContext $context ): RowNormalizer {
-		return new RowNormalizer( new EntryNormalizer( $context->config->caster(), $this->dateTimeFormat ) );
-	}
+    /**
+     * Creates a row normalizer instance
+     *
+     * @param FlowContext $context The flow context
+     * @return RowNormalizer The created normalizer
+     */
+    public function create_normalizer(FlowContext $context): RowNormalizer
+    {
+        return new RowNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
+    }
 
+    /**
+     * Loads posts from the provided rows
+     *
+     * @param Rows $rows The rows to process
+     * @param FlowContext $context The flow context
+     * @throws WPAdapterMissingDataException When no posts are found to process
+     * @return void
+     */
     public function load(Rows $rows, FlowContext $context): void
     {
         if (!$rows->count()) {
             throw WPAdapterMissingDataException::noEntitiesFound('post', 'No posts found to process');
         }
 
-        $normalizer = $this->create_normalizer( $context );
+        $normalizer = $this->create_normalizer($context);
 
         foreach ($rows as $row) {
             $this->insertPost($row, $normalizer);
         }
     }
 
-    public function insertPost(Row | array $row, RowNormalizer | null $normalizer = null ): int
+    /**
+     * Inserts or updates a WordPress post
+     *
+     * @param Row|array<string, mixed> $row The row data to process
+     * @param RowNormalizer|null $normalizer Optional normalizer for the data
+     * @throws WPAdapterDatabaseException When post insertion/update fails
+     * @return int The ID of the inserted/updated post
+     */
+    public function insertPost(Row | array $row, ?RowNormalizer $normalizer = null): int
     {
-		// Normalize
-		if ( $row instanceof Row && $normalizer instanceof RowNormalizer ) {
-			$data = $normalizer->normalize( $row );
-		} else {
-			$data = $row;
-		}
+        // Normalize
+        if ($row instanceof Row && $normalizer instanceof RowNormalizer) {
+            $data = $normalizer->normalize($row);
+        } else {
+            $data = $row;
+        }
 
         // Sanitize input data
         $sanitizedData = $this->sanitizePostData($data);
@@ -89,10 +132,10 @@ final class WPPostsLoader implements Loader
     }
 
     /**
-     * Sanitize post data before insertion
+     * Sanitizes post data before insertion
      *
-     * @param array $data Raw post data
-     * @return array Sanitized post data
+     * @param array<string, mixed> $data Raw post data
+     * @return array<string, mixed> Sanitized post data
      */
     private function sanitizePostData(array $data): array
     {
@@ -167,7 +210,7 @@ final class WPPostsLoader implements Loader
     }
 
     /**
-     * Validate a date string
+     * Validates a date string
      *
      * @param string $date Date string to validate
      * @return bool Whether the date is valid
@@ -178,6 +221,12 @@ final class WPPostsLoader implements Loader
         return $d && $d->format('Y-m-d H:i:s') === $date;
     }
 
+    /**
+     * Sets the datetime format for the loader
+     *
+     * @param string $dateTimeFormat The format to use (should be a valid PHP date format)
+     * @return self New instance with the updated format
+     */
     public function withDateTimeFormat(string $dateTimeFormat): self
     {
         $clone = clone $this;
@@ -185,6 +234,12 @@ final class WPPostsLoader implements Loader
         return $clone;
     }
 
+    /**
+     * Sets default values for post fields
+     *
+     * @param array<string, mixed> $defaults The default values to set
+     * @return self New instance with the updated defaults
+     */
     public function withDefaults(array $defaults): self
     {
         $clone = clone $this;

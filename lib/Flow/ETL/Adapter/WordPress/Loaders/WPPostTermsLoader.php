@@ -11,26 +11,56 @@ use Flow\ETL\Adapter\WordPress\Exception\{
 };
 use Flow\ETL\Adapter\WordPress\Normalizers\{
     EntryNormalizer,
-    RowsNormalizer
+    RowNormalizer
 };
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Exception\RuntimeException;
 use Flow\ETL\Row\Entry;
 
+/**
+ * WordPress Post Terms Loader for ETL operations
+ *
+ * This loader handles the association of terms with WordPress posts during ETL processes.
+ * It supports data normalization, sanitization, and proper error handling for term relationships.
+ *
+ * @implements Loader
+ */
 final class WPPostTermsLoader implements Loader
 {
+    /**
+     * @var string The format to use for datetime values
+     */
     private string $dateTimeFormat = \DateTimeInterface::ATOM;
 
+    /**
+     * Constructor
+     *
+     * @param array<string, mixed> $config Configuration array for the loader
+     */
     public function __construct(
         private readonly array $config = []
     ) {
     }
 
-    public function create_normalizer(FlowContext $context): RowsNormalizer
+    /**
+     * Creates a row normalizer instance
+     *
+     * @param FlowContext $context The flow context
+     * @return RowNormalizer The created normalizer
+     */
+    public function create_normalizer(FlowContext $context): RowNormalizer
     {
-        return new RowsNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
+        return new RowNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
     }
 
+    /**
+     * Loads post terms from the provided rows
+     *
+     * @param Rows $rows The rows to process
+     * @param FlowContext $context The flow context
+     * @throws WPAdapterMissingDataException When no post terms are found to process
+     * @return void
+     */
     public function load(Rows $rows, FlowContext $context): void
     {
         if (!$rows->count()) {
@@ -39,16 +69,25 @@ final class WPPostTermsLoader implements Loader
 
         $normalizer = $this->create_normalizer($context);
 
-        foreach ($normalizer->normalize($rows) as $normalizedRow) {
-            $this->setPostTerms($normalizedRow);
+        foreach ($rows as $row) {
+            $this->setPostTerms($row, $normalizer);
         }
     }
 
-    public function setPostTerms(Row | array $row, RowsNormalizer | null $normalizer = null): bool
+    /**
+     * Sets terms for a WordPress post
+     *
+     * @param Row|array<string, mixed> $row The row data to process
+     * @param RowNormalizer|null $normalizer Optional normalizer for the data
+     * @throws WPAdapterDataException When required data is missing or invalid
+     * @throws WPAdapterDatabaseException When term assignment fails
+     * @return bool True on successful term assignment
+     */
+    public function setPostTerms(Row | array $row, ?RowNormalizer $normalizer = null): bool
     {
         // Normalize
-        if ($row instanceof Row && $normalizer instanceof RowsNormalizer) {
-            $data = $normalizer->normalize(new Rows([$row]))[0];
+        if ($row instanceof Row && $normalizer instanceof RowNormalizer) {
+            $data = $normalizer->normalize($row);
         } else {
             $data = $row;
         }
@@ -116,10 +155,10 @@ final class WPPostTermsLoader implements Loader
     }
 
     /**
-     * Sanitize post terms data before processing
+     * Sanitizes post terms data before processing
      *
-     * @param array $data Raw post terms data
-     * @return array Sanitized post terms data
+     * @param array<string, mixed> $data Raw post terms data
+     * @return array<string, mixed> Sanitized post terms data
      */
     private function sanitizePostTermsData(array $data): array
     {
@@ -144,10 +183,10 @@ final class WPPostTermsLoader implements Loader
     }
 
     /**
-     * Sanitize term values before setting them
+     * Sanitizes term values before setting them
      *
-     * @param array $terms Array of term values (can be term IDs, names, or slugs)
-     * @return array Sanitized term values
+     * @param array<int|string> $terms Array of term values (can be term IDs, names, or slugs)
+     * @return array<int|string> Sanitized term values
      */
     private function sanitizeTermValues(array $terms): array
     {
@@ -165,6 +204,12 @@ final class WPPostTermsLoader implements Loader
         }, $terms);
     }
 
+    /**
+     * Sets the datetime format for the loader
+     *
+     * @param string $dateTimeFormat The format to use (should be a valid PHP date format)
+     * @return self New instance with the updated format
+     */
     public function withDateTimeFormat(string $dateTimeFormat): self
     {
         $clone = clone $this;

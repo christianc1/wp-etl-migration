@@ -107,11 +107,12 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 				$new_value = $value;
 
 				foreach ( $matches[1] as $placeholder ) {
-					if ( isset( $attachments[$placeholder] ) ) {
+					$key = $placeholder . '.attachment_id';
+					if ( isset( $attachments[$key] ) ) {
 						// Replace placeholder with actual attachment ID
 						$new_value = str_replace(
 							"%%{$placeholder}%%",
-							(string)$attachments[$placeholder],
+							(string)$attachments[$key],
 							$new_value
 						);
 					}

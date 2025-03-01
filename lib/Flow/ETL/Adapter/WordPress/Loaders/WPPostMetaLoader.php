@@ -11,26 +11,56 @@ use Flow\ETL\Adapter\WordPress\Exception\{
 };
 use Flow\ETL\Adapter\WordPress\Normalizers\{
     EntryNormalizer,
-    RowsNormalizer
+    RowNormalizer
 };
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Exception\RuntimeException;
 use Flow\ETL\Row\Entry;
 
+/**
+ * WordPress Post Meta Loader for ETL operations
+ *
+ * This loader handles the insertion and updating of WordPress post meta data during ETL processes.
+ * It supports data normalization, sanitization, and proper error handling for post meta operations.
+ *
+ * @implements Loader
+ */
 final class WPPostMetaLoader implements Loader
 {
+    /**
+     * @var string The format to use for datetime values
+     */
     private string $dateTimeFormat = \DateTimeInterface::ATOM;
 
+    /**
+     * Constructor
+     *
+     * @param array<string, mixed> $config Configuration array for the loader
+     */
     public function __construct(
         private readonly array $config = []
     ) {
     }
 
-    public function create_normalizer(FlowContext $context): RowsNormalizer
+    /**
+     * Creates a row normalizer instance
+     *
+     * @param FlowContext $context The flow context
+     * @return RowNormalizer The created normalizer
+     */
+    public function create_normalizer(FlowContext $context): RowNormalizer
     {
-        return new RowsNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
+        return new RowNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
     }
 
+    /**
+     * Loads post meta from the provided rows
+     *
+     * @param Rows $rows The rows to process
+     * @param FlowContext $context The flow context
+     * @throws WPAdapterMissingDataException When no post meta is found to process
+     * @return void
+     */
     public function load(Rows $rows, FlowContext $context): void
     {
         if (!$rows->count()) {
@@ -39,16 +69,25 @@ final class WPPostMetaLoader implements Loader
 
         $normalizer = $this->create_normalizer($context);
 
-        foreach ($normalizer->normalize($rows) as $normalizedRow) {
-            $this->insertPostMeta($normalizedRow);
+        foreach ($rows as $row) {
+            $this->insertPostMeta($row, $normalizer);
         }
     }
 
-    public function insertPostMeta(Row | array $row, RowsNormalizer | null $normalizer = null): bool
+    /**
+     * Inserts or updates post meta for a WordPress post
+     *
+     * @param Row|array<string, mixed> $row The row data to process
+     * @param RowNormalizer|null $normalizer Optional normalizer for the data
+     * @throws WPAdapterDataException When required data is missing or invalid
+     * @throws WPAdapterDatabaseException When meta update fails
+     * @return bool True on successful meta update
+     */
+    public function insertPostMeta(Row | array $row, ?RowNormalizer $normalizer = null): bool
     {
         // Normalize
-        if ($row instanceof Row && $normalizer instanceof RowsNormalizer) {
-            $data = $normalizer->normalize(new Rows([$row]))[0];
+        if ($row instanceof Row && $normalizer instanceof RowNormalizer) {
+            $data = $normalizer->normalize($row);
         } else {
             $data = $row;
         }

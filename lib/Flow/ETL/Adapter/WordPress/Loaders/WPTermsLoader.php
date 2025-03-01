@@ -11,26 +11,56 @@ use Flow\ETL\Adapter\WordPress\Exception\{
 };
 use Flow\ETL\Adapter\WordPress\Normalizers\{
     EntryNormalizer,
-    RowsNormalizer
+    RowNormalizer
 };
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use Flow\ETL\Exception\RuntimeException;
 use Flow\ETL\Row\Entry;
 
+/**
+ * WordPress Terms Loader for ETL operations
+ *
+ * This loader handles the insertion and updating of WordPress taxonomy terms during ETL processes.
+ * It supports data normalization, sanitization, and proper error handling for term operations.
+ *
+ * @implements Loader
+ */
 final class WPTermsLoader implements Loader
 {
+    /**
+     * @var string The format to use for datetime values
+     */
     private string $dateTimeFormat = \DateTimeInterface::ATOM;
 
+    /**
+     * Constructor
+     *
+     * @param array<string, mixed> $config Configuration array for the loader
+     */
     public function __construct(
         private readonly array $config = []
     ) {
     }
 
-    public function create_normalizer(FlowContext $context): RowsNormalizer
+    /**
+     * Creates a row normalizer instance
+     *
+     * @param FlowContext $context The flow context
+     * @return RowNormalizer The created normalizer
+     */
+    public function create_normalizer(FlowContext $context): RowNormalizer
     {
-        return new RowsNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
+        return new RowNormalizer(new EntryNormalizer($context->config->caster(), $this->dateTimeFormat));
     }
 
+    /**
+     * Loads terms from the provided rows
+     *
+     * @param Rows $rows The rows to process
+     * @param FlowContext $context The flow context
+     * @throws WPAdapterMissingDataException When no terms are found to process
+     * @return void
+     */
     public function load(Rows $rows, FlowContext $context): void
     {
         if (!$rows->count()) {
@@ -39,16 +69,25 @@ final class WPTermsLoader implements Loader
 
         $normalizer = $this->create_normalizer($context);
 
-        foreach ($normalizer->normalize($rows) as $normalizedRow) {
-            $this->insertTerm($normalizedRow);
+        foreach ($rows as $row) {
+            $this->insertTerm($row, $normalizer);
         }
     }
 
-    public function insertTerm(Row | array $row, RowsNormalizer | null $normalizer = null): bool
+    /**
+     * Inserts or updates a WordPress term
+     *
+     * @param Row|array<string, mixed> $row The row data to process
+     * @param RowNormalizer|null $normalizer Optional normalizer for the data
+     * @throws WPAdapterDataException When required data is missing or invalid
+     * @throws WPAdapterDatabaseException When term insertion/update fails
+     * @return bool True on successful insertion/update
+     */
+    public function insertTerm(Row | array $row, ?RowNormalizer $normalizer = null): bool
     {
         // Normalize
-        if ($row instanceof Row && $normalizer instanceof RowsNormalizer) {
-            $data = $normalizer->normalize(new Rows([$row]))[0];
+        if ($row instanceof Row && $normalizer instanceof RowNormalizer) {
+            $data = $normalizer->normalize($row);
         } else {
             $data = $row;
         }
@@ -110,10 +149,10 @@ final class WPTermsLoader implements Loader
     }
 
     /**
-     * Sanitize term data before insertion
+     * Sanitizes term data before insertion
      *
-     * @param array $data Raw term data
-     * @return array Sanitized term data
+     * @param array<string, mixed> $data Raw term data
+     * @return array<string, mixed> Sanitized term data
      */
     private function sanitizeTermData(array $data): array
     {
@@ -165,6 +204,12 @@ final class WPTermsLoader implements Loader
         return $sanitized;
     }
 
+    /**
+     * Sets the datetime format for the loader
+     *
+     * @param string $dateTimeFormat The format to use (should be a valid PHP date format)
+     * @return self New instance with the updated format
+     */
     public function withDateTimeFormat(string $dateTimeFormat): self
     {
         $clone = clone $this;
