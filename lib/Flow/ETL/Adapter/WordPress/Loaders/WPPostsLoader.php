@@ -132,9 +132,9 @@ final class WPPostsLoader implements Loader
     }
 
     /**
-     * Sanitizes post data before insertion
+     * Sanitizes post data
      *
-     * @param array<string, mixed> $data Raw post data
+     * @param array<string, mixed> $data The post data to sanitize
      * @return array<string, mixed> Sanitized post data
      */
     private function sanitizePostData(array $data): array
@@ -146,15 +146,15 @@ final class WPPostsLoader implements Loader
             $sanitized['post.post_title'] = sanitize_text_field($data['post.post_title']);
         }
 
-        if (isset($data['post.post_excerpt'])) {
-            $sanitized['post.post_excerpt'] = sanitize_text_field($data['post.post_excerpt']);
-        }
-
         if (isset($data['post.post_name'])) {
             $sanitized['post.post_name'] = sanitize_title($data['post.post_name']);
         }
 
-        // Content can contain HTML, so use wp_kses_post
+        if (isset($data['post.post_excerpt'])) {
+            $sanitized['post.post_excerpt'] = sanitize_text_field($data['post.post_excerpt']);
+        }
+
+        // Sanitize content with wp_kses_post to allow HTML but prevent XSS
         if (isset($data['post.post_content'])) {
             $sanitized['post.post_content'] = wp_kses_post($data['post.post_content']);
         }
@@ -179,15 +179,28 @@ final class WPPostsLoader implements Loader
         }
 
         // Sanitize dates
+        $has_post_date = false;
+        $post_date = null;
+
         if (isset($data['post.post_date'])) {
             // Validate date format
             $date = sanitize_text_field($data['post.post_date']);
-            $sanitized['post.post_date'] = $this->validateDate($date) ? $date : current_time('mysql');
+            if ($this->validateDate($date)) {
+                $sanitized['post.post_date'] = $date;
+                $has_post_date = true;
+                $post_date = $date;
+            } else {
+                $sanitized['post.post_date'] = current_time('mysql');
+                $post_date = current_time('mysql');
+            }
         }
 
         if (isset($data['post.post_date_gmt'])) {
             $date = sanitize_text_field($data['post.post_date_gmt']);
             $sanitized['post.post_date_gmt'] = $this->validateDate($date) ? $date : get_gmt_from_date(current_time('mysql'));
+        } elseif ($has_post_date) {
+            // If post_date is set but post_date_gmt is not, derive it from post_date
+            $sanitized['post.post_date_gmt'] = get_gmt_from_date($post_date);
         }
 
         // Pass through IDs after sanitizing
@@ -210,15 +223,26 @@ final class WPPostsLoader implements Loader
     }
 
     /**
-     * Validates a date string
+     * Validates a date string in various formats
      *
      * @param string $date Date string to validate
      * @return bool Whether the date is valid
      */
     private function validateDate(string $date): bool
     {
+        // Try standard MySQL format
         $d = \DateTime::createFromFormat('Y-m-d H:i:s', $date);
-        return $d && $d->format('Y-m-d H:i:s') === $date;
+        if ($d && $d->format('Y-m-d H:i:s') === $date) {
+            return true;
+        }
+
+        // Try ISO 8601 format (e.g., 2017-12-31T00:00:00+00:00)
+        try {
+            $d = new \DateTime($date);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**

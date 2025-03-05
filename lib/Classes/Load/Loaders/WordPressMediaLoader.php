@@ -39,7 +39,7 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 		parent::__construct( $step_config, $global_config );
 
 		$this->media_adapter = new WPMediaLoader( $step_config['args'] ?? [] );
-		$this->media_adapter->withDateTimeFormat( 'Y-m-d H:i:s' );
+		$this->media_adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
 	}
 
 	/**

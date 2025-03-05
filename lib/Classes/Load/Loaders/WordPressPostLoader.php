@@ -40,7 +40,7 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 		parent::__construct( $step_config, $global_config );
 
 		$this->posts_adapter = new WPPostsLoader( $step_config['args'] ?? [] );
-		$this->posts_adapter->withDateTimeFormat( 'Y-m-d H:i:s' );
+		$this->posts_adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
 	}
 
 	/**
