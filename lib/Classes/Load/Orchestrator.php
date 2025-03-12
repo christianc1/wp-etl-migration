@@ -68,6 +68,7 @@ class Orchestrator {
 		$this->step_config = $job_config->get_value( 'load' );
 		$this->loaders     = [];
 		$this->adapter_factory = new AdapterFactory( $this->config );
+		$this->synchronous_loader = $this->get_synchronous_loader();
 	}
 
 	/**
@@ -98,6 +99,10 @@ class Orchestrator {
 	}
 
 	public function get_synchronous_loader() {
+		if ( $this->synchronous_loader ) {
+			return $this->synchronous_loader;
+		}
+
 		$loaders = [];
 		$all     = false;
 		foreach ( $this->step_config as $load_operation ) {
@@ -122,7 +127,8 @@ class Orchestrator {
 			array_push( $loaders, $this->adapter_factory->create( $load_operation ) );
 		}
 
-		return new Loaders\SynchronousPipelineLoader( $loaders );
+		$this->synchronous_loader = new Loaders\SynchronousPipelineLoader( $loaders );
+		return $this->synchronous_loader;
 	}
 
 	/**

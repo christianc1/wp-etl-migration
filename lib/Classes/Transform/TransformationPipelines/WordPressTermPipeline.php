@@ -58,6 +58,13 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 	protected $ledger_prefix = 'ledger';
 
 	/**
+	 * Prefix for meta fields.
+	 *
+	 * @var string
+	 */
+	protected $meta_prefix = 'meta';
+
+	/**
 	 * Get prefixed term field name.
 	 *
 	 * @param string $term_field The term field.
@@ -65,6 +72,16 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 	 */
 	public function term( string $term_field ) {
 		return $this->term_prefix . '.' . $term_field;
+	}
+
+	/**
+	 * Get prefixed meta field name.
+	 *
+	 * @param string $meta_field The meta field name.
+	 * @return string The prefixed meta field name.
+	 */
+	public function meta( string $meta_field ) {
+		return $this->meta_prefix . '.' . $meta_field;
 	}
 
 	/**
@@ -93,6 +110,7 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 			->term_parent()
 			->term_description()
 			->term_alias_of()
+			->term_meta()
 			->ledger_records();
 
 		return $this;

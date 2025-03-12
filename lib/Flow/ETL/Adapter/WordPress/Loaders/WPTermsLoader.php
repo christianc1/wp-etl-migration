@@ -111,6 +111,12 @@ final class WPTermsLoader implements Loader
             ]);
         }
 
+        // Process parent term if specified
+        $parentTermId = 0;
+        if (!empty($sanitizedData['term.parent'])) {
+            $parentTermId = $this->ensureParentTermExists($sanitizedData['term.parent'], $taxonomy, $normalizer);
+        }
+
         // Insert or update the term
         $termData = wp_insert_term(
             $name,
@@ -118,6 +124,7 @@ final class WPTermsLoader implements Loader
             [
                 'slug' => $slug,
                 'description' => $sanitizedData['term.description'] ?? '',
+                'parent' => $parentTermId,
             ]
         );
 
@@ -149,6 +156,58 @@ final class WPTermsLoader implements Loader
     }
 
     /**
+     * Ensures that a parent term exists, creating it if necessary
+     *
+     * @param int|string $parent The parent term ID or slug
+     * @param string $taxonomy The taxonomy to use
+     * @param RowNormalizer|null $normalizer Optional normalizer for the data
+     * @return int The parent term ID
+     * @throws WPAdapterDataException When parent term cannot be created
+     */
+    private function ensureParentTermExists($parent, string $taxonomy, ?RowNormalizer $normalizer = null): int
+    {
+        // If numeric, assume it's a term ID
+        if (is_numeric($parent)) {
+            $parentId = (int)$parent;
+            $parentTerm = get_term_by('id', $parentId, $taxonomy);
+            if ($parentTerm) {
+                return $parentId;
+            }
+        } else {
+            // Try to find by slug
+            $parentTerm = get_term_by('slug', sanitize_title($parent), $taxonomy);
+            if ($parentTerm) {
+                return $parentTerm->term_id;
+            }
+
+            // Try to find by name
+            $parentTerm = get_term_by('name', $parent, $taxonomy);
+            if ($parentTerm) {
+                return $parentTerm->term_id;
+            }
+        }
+
+        // Parent doesn't exist, create it
+        $parentData = wp_insert_term(
+            is_numeric($parent) ? "Parent Term {$parent}" : $parent,
+            $taxonomy,
+            [
+                'slug' => is_numeric($parent) ? "parent-term-{$parent}" : sanitize_title($parent),
+            ]
+        );
+
+        if (is_wp_error($parentData)) {
+            throw WPAdapterDataException::invalidDataFormat('term.parent', 'valid term', [
+                'parent' => $parent,
+                'taxonomy' => $taxonomy,
+                'error' => $parentData->get_error_message(),
+            ]);
+        }
+
+        return $parentData['term_id'];
+    }
+
+    /**
      * Sanitizes term data before insertion
      *
      * @param array<string, mixed> $data Raw term data
@@ -176,6 +235,17 @@ final class WPTermsLoader implements Loader
         // Sanitize term description (can contain limited HTML)
         if (isset($data['term.description'])) {
             $sanitized['term.description'] = wp_kses_post($data['term.description']);
+        }
+
+        // Sanitize parent term ID if present
+        if (isset($data['term.parent'])) {
+            if (is_numeric($data['term.parent'])) {
+                $sanitized['term.parent'] = (int)$data['term.parent'];
+            } elseif (is_string($data['term.parent'])) {
+                $sanitized['term.parent'] = sanitize_text_field($data['term.parent']);
+            } else {
+                $sanitized['term.parent'] = $data['term.parent'];
+            }
         }
 
         // Pass through any meta fields for later processing

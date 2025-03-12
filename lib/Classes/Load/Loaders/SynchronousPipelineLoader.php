@@ -51,6 +51,7 @@ final class SynchronousPipelineLoader implements Loader, Closure {
 				$rows = $loader->collect_mutated_rows();
 			}
 		}
+		unset( $rows );
 	}
 
 	/**

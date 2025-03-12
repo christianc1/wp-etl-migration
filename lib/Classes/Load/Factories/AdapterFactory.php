@@ -27,7 +27,7 @@ use Flow\ETL\Adapter\WordPress\Loaders\{
 	WPUserLoader
 };
 
-use function Flow\ETL\Adapter\Json\{to_json};
+use function Flow\ETL\Adapter\Json\{to_json_lines, to_json};
 use function Flow\ETL\Adapter\CSV\{to_csv};
 use function Flow\ETL\Adapter\WordPress\{
 	to_wp_post_meta,
