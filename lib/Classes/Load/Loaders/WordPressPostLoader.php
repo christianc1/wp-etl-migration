@@ -33,6 +33,13 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 	 */
 	protected $adapter;
 
+	/**
+	 * Keep track of the last normalized data for garbage collection
+	 *
+	 * @var array|null
+	 */
+	private $last_normalized_data = null;
+
 	public function __construct(
 		protected array $step_config,
 		protected GlobalConfig $global_config,
@@ -67,6 +74,8 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 	 */
 	public function load( Rows $rows, FlowContext $context ): void {
 		$normalizer = $this->posts_adapter->create_normalizer( $context );
+		$processed_count = 0;
+		$memory_cleanup_interval = 10; // Clean up memory every X posts
 
 		foreach ( $rows as $row ) {
 			try {

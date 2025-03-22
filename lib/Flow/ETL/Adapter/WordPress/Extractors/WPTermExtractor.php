@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\WordPress;
+namespace Flow\ETL\Adapter\WordPress\Extractors;
 
 use function Flow\ETL\DSL\array_to_rows;
 use Flow\ETL\Extractor\{Limitable, LimitableExtractor};
@@ -93,7 +93,7 @@ final class WPTermExtractor implements Extractor, LimitableExtractor
             'term_taxonomy_id' => (int) $term->term_taxonomy_id,
             'taxonomy' => $term->taxonomy,
             'description' => $term->description,
-            'parent' => (int) $term->parent,
+            'parent' => $term->parent ? get_term($term->parent)->slug : '',
             'count' => (int) $term->count,
         ];
     }

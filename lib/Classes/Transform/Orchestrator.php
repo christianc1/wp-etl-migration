@@ -109,7 +109,7 @@ class Orchestrator {
 			return $this;
 		}
 
-		$transformation_pipeline = new $configured_pipeline( $this->state, $this->ledger_registry );
+		$transformation_pipeline = new $configured_pipeline( $this->state, $this->config, $this->job_config );
 
 		$this->state = $transformation_pipeline->run()->get_final_state();
 

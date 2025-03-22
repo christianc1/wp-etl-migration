@@ -48,10 +48,19 @@ final class SynchronousPipelineLoader implements Loader, Closure {
 			}
 
 			if ( $loader instanceof RowMutator && $loader->has_mutated_rows() ) {
+				unset( $rows );
 				$rows = $loader->collect_mutated_rows();
+
 			}
 		}
-		unset( $rows );
+
+		// Final batch memory cleanup
+		$this->cleanup_memory();
+		$processed_count = count( $rows );
+		$this->log( "Batch complete - Memory cleaned after processing $processed_count posts.", 'progress' );
+
+		$memory_usage = memory_get_usage( true );
+		$this->log( "Memory usage: " . round( $memory_usage / 1024 / 1024, 2 ) . " MB", 'debug' );
 	}
 
 	/**
@@ -67,6 +76,42 @@ final class SynchronousPipelineLoader implements Loader, Closure {
 			if ( $loader instanceof Closure ) {
 				$loader->closure( $context );
 			}
+		}
+	}
+
+	/**
+	 * Cleanup memory by releasing references and triggering garbage collection
+	 *
+	 * @return void
+	 */
+	public function cleanup_memory(): void {
+		global $wp_object_cache, $wpdb;
+
+		if ( ! is_object( $wp_object_cache ) ) {
+			return;
+		}
+
+		$properties = [
+			'group_ops',
+			'memcache_debug',
+			'cache',
+		];
+
+		foreach ( $properties as $property ) {
+			if ( property_exists( $wp_object_cache, $property ) ) {
+				$wp_object_cache->$property = [];
+			}
+		}
+
+		if ( method_exists( $wp_object_cache, '__remoteset' ) ) {
+			$wp_object_cache->__remoteset(); // important
+		}
+
+		$wpdb->queries = array();
+
+		// Force PHP garbage collection
+		if (function_exists('gc_collect_cycles')) {
+			gc_collect_cycles();
 		}
 	}
 }

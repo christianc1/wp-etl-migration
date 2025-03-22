@@ -86,6 +86,7 @@ class Orchestrator {
 			->withEntry( 'etl.uid', uuid_v4() );
 
 		$this->get_current_state()
+			->batchSize( 10 )
 			// We can set the mode to overwrite here because each step config sets this individually (default false).
 			// This just allows all those steps that set overwrite: true to actually overwrite the file.
 			->mode( SaveMode::Overwrite )

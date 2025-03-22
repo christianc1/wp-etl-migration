@@ -16,7 +16,7 @@ use TenupETL\Utils\WithLogging;
 /**
  * Simple transformer that executes a callable function on rows.
  */
-final class SimpleTransformer implements ScalarFunction {
+final class SimpleTransformer implements ScalarFunction, Transformer {
 	use WithLogging;
 
 	/**
@@ -44,5 +44,11 @@ final class SimpleTransformer implements ScalarFunction {
 	 */
 	public function eval( Row $row ): mixed {
 		return call_user_func( $this->call, $row, ...$this->args );
+	}
+
+	public function transform( Rows $rows, FlowContext $context ): Rows {
+		$rows->each( fn( Row $row ) => $this->eval( $row ) );
+
+		return $rows;
 	}
 }

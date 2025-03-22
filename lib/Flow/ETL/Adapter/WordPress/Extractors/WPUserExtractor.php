@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\WordPress;
+namespace Flow\ETL\Adapter\WordPress\Extractors;
 
 use function Flow\ETL\DSL\array_to_rows;
 use Flow\ETL\Extractor\{Limitable, LimitableExtractor};

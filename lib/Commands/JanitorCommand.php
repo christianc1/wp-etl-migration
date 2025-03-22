@@ -92,11 +92,22 @@ class JanitorCommand extends BaseCommand {
 	 * [--post_type=<post_types>]
 	 * : List of post types to delete separated by comma.
 	 *
-	 * [--posts_per_page=<posts_per_page>]
-	 * : Number of items per page. Defaults to 1000.
+	 * [--batch-size=<batch-size>]
+	 * : Number of posts to delete in a single batch. Defaults to 100.
 	 *
 	 * [--yes]
-	 * : Proceed to delete the posts without a confirmation prompt.
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Delete all posts of type 'post'
+	 *     $ wp etl janitor empty-posts --post_type=post
+	 *
+	 *     # Delete all posts of types 'post' and 'page' without confirmation
+	 *     $ wp etl janitor empty-posts --post_type=post,page --yes
+	 *
+	 *     # Delete posts in larger batches (500 at a time)
+	 *     $ wp etl janitor empty-posts --post_type=post --batch-size=500
 	 *
 	 * @param array $args       Command arguments.
 	 * @param array $assoc_args Command associative arguments.
@@ -104,40 +115,84 @@ class JanitorCommand extends BaseCommand {
 	 * @subcommand empty-posts
 	 */
 	public function empty_posts( $args, $assoc_args ) {
-		$_post_type      = (string) WP_CLI\Utils\get_flag_value( $assoc_args, 'post_type', '' );
-		$_posts_per_page = (int) WP_CLI\Utils\get_flag_value( $assoc_args, 'posts_per_page', 1000 );
-		$_posts_per_page = $_posts_per_page > 1000 ? 1000 : $_posts_per_page;
+		global $wpdb;
 
-		if ( empty( $_post_type ) ) {
-			WP_CLI::error( 'Please provide one (or more) post types separated by a comma.' );
+		// Get parameters
+		$post_type  = (string) WP_CLI\Utils\get_flag_value( $assoc_args, 'post_type', '' );
+		$batch_size = (int) WP_CLI\Utils\get_flag_value( $assoc_args, 'batch-size', 100 );
+
+		if ( empty( $post_type ) ) {
+			WP_CLI::error( 'Please provide one or more post types separated by comma using --post_type parameter.' );
 		}
 
-		$options    = array(
-			'return'     => true,
-			'parse'      => 'json',
-			'launch'     => false,
-			'exit_error' => true,
-		);
-		$_posts_ids = WP_CLI::runcommand(
-			sprintf(
-				'post list --post_type=%s --posts_per_page=%d --field=ID --format=json',
-				$_post_type,
-				$_posts_per_page
-			),
-			$options
+		// Get total post count directly from database for reliability
+		$post_types = explode( ',', $post_type );
+		$placeholders = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
+
+		$query = $wpdb->prepare(
+			"SELECT COUNT(*) FROM $wpdb->posts WHERE post_type IN ($placeholders)",
+			$post_types
 		);
 
-		if ( empty( $_posts_ids ) ) {
-			WP_CLI::warning( 'No posts found.' );
+		$total_count = (int) $wpdb->get_var( $query );
+
+		if ( 0 === $total_count ) {
+			WP_CLI::warning( 'No posts found for the specified post type(s).' );
 			return;
 		}
 
-		WP_CLI::confirm( sprintf( 'Are you sure you want to delete %d posts?', count( $_posts_ids ) ), $assoc_args );
+		// Confirm deletion
+		WP_CLI::confirm(
+			sprintf( 'You are about to delete all %d posts of type(s) "%s". Continue?', $total_count, $post_type ),
+			$assoc_args
+		);
 
-		$_posts_ids = join( ' ', $_posts_ids );
+		// Set up progress display
+		$progress = \WP_CLI\Utils\make_progress_bar( 'Deleting posts', $total_count );
+		$deleted_count = 0;
+
+		// Start bulk operation
 		self::start_bulk_operation();
-		WP_CLI::runcommand( "post delete --force --defer-term-counting {$_posts_ids}", $options );
+
+		// Process in batches
+		$remaining = $total_count;
+
+		while ( $remaining > 0 ) {
+			// Get post IDs directly from database
+			$post_ids_query = $wpdb->prepare(
+				"SELECT ID FROM $wpdb->posts WHERE post_type IN ($placeholders) LIMIT %d",
+				array_merge( $post_types, array( $batch_size ) )
+			);
+
+			$post_ids = $wpdb->get_col( $post_ids_query );
+
+			if ( empty( $post_ids ) ) {
+				break; // No more posts found
+			}
+
+			$current_batch_size = count( $post_ids );
+
+			// Delete posts in this batch
+			foreach ( $post_ids as $post_id ) {
+				wp_delete_post( $post_id, true ); // true = force delete, bypass trash
+				$deleted_count++;
+				$progress->tick();
+			}
+
+			$remaining -= $current_batch_size;
+
+			// Flush the cache periodically to avoid memory issues
+			if ( $deleted_count % 500 === 0 ) {
+				wp_cache_flush();
+			}
+		}
+
+		// End bulk operation
 		self::end_bulk_operation();
+		$progress->finish();
+
+		// Report success
+		WP_CLI::success( sprintf( 'Successfully deleted %d posts.', $deleted_count ) );
 	}
 
 	/**

@@ -10,15 +10,17 @@
 namespace TenupETL\Classes\Transform\TransformationPipelines;
 
 use Flow\ETL\DataFrame;
-use TenupETL\Classes\Load\LedgerRegistry;
+use TenupETL\Classes\Config\{GlobalConfig, JobConfig};
+
 interface TransformationPipeline {
 	/**
 	 * Constructor.
 	 *
 	 * @param DataFrame      $state           The initial state of the transformation pipeline.
-	 * @param LedgerRegistry $ledger_registry The ledger registry.
+	 * @param GlobalConfig   $config          Global configuration.
+	 * @param JobConfig      $job_config      Job configuration.
 	 */
-	public function __construct( DataFrame $state, LedgerRegistry $ledger_registry );
+	public function __construct( DataFrame $state, GlobalConfig $config, JobConfig $job_config );
 
 	/**
 	 * Run the transformation pipeline.

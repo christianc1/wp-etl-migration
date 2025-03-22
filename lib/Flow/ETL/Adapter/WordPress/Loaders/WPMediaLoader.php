@@ -183,6 +183,9 @@ final class WPMediaLoader implements Loader
             }
         }
 
+        // Unset any large temporary variables we created
+        unset($direct_media);
+
         return $media_groups;
     }
 
@@ -333,6 +336,12 @@ final class WPMediaLoader implements Loader
         $attachment_id = media_sideload_image($url, $post_parent, $desc, 'id');
 
         if (is_wp_error($attachment_id)) {
+            // Check if a temporary file was created and clean it up if necessary
+            $upload_dir = wp_upload_dir();
+            $temp_file = $upload_dir['basedir'] . '/temp_' . md5($url);
+            if (file_exists($temp_file)) {
+                @unlink($temp_file);
+            }
             return $attachment_id;
         }
 

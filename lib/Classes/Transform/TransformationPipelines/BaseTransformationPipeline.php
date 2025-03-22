@@ -9,6 +9,7 @@
 
 namespace TenupETL\Classes\Transform\TransformationPipelines;
 
+use TenupETL\Classes\Config\{GlobalConfig, JobConfig};
 use TenupETL\Classes\Load\LedgerRegistry;
 use Flow\ETL\DataFrame;
 
@@ -26,9 +27,10 @@ abstract class BaseTransformationPipeline implements TransformationPipeline {
 	 * Constructor.
 	 *
 	 * @param DataFrame      $state           The initial state of the transformation pipeline.
-	 * @param LedgerRegistry $ledger_registry Ledger registry instance.
+	 * @param GlobalConfig   $config          Global configuration.
+	 * @param JobConfig      $job_config      Job configuration.
 	 */
-	public function __construct( protected DataFrame $state, protected LedgerRegistry $ledger_registry ) {
+	public function __construct( protected DataFrame $state, protected GlobalConfig $config, protected JobConfig $job_config ) {
 		$this->uid = time();
 	}
 

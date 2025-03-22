@@ -184,6 +184,15 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 	}
 
 	/**
+	 * Set the term meta.
+	 *
+	 * @return TransformationPipeline The pipeline instance.
+	 */
+	protected function term_meta(): TransformationPipeline {
+		return $this;
+	}
+
+	/**
 	 * Set ledger records.
 	 *
 	 * @return TransformationPipeline The pipeline instance.
