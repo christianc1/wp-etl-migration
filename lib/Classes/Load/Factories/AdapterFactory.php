@@ -67,7 +67,7 @@ class AdapterFactory {
 			'wp_post_meta' => to_wp_post_meta( [] ),
 			'wp_post_terms' => to_wp_post_terms( [] ),
 			'wp_post_media' => new Loaders\WordPressMediaLoader( $load_operation, $this->config ),
-			'wp_term' => to_wp_terms( [] ),
+			'wp_term' => new Loaders\WordPressTermLoader( $load_operation, $this->config ),
 			'wp_user' => to_wp_user( [] ),
 			'ledger' => new Loaders\LedgerLoader( $load_operation, $this->config ),
 			'custom' => new($load_operation['pipeline'])( $load_operation, $this->config ),

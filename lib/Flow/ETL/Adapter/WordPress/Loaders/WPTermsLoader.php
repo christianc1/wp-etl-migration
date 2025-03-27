@@ -81,9 +81,9 @@ final class WPTermsLoader implements Loader
      * @param RowNormalizer|null $normalizer Optional normalizer for the data
      * @throws WPAdapterDataException When required data is missing or invalid
      * @throws WPAdapterDatabaseException When term insertion/update fails
-     * @return bool True on successful insertion/update
+     * @return int The term ID
      */
-    public function insertTerm(Row | array $row, ?RowNormalizer $normalizer = null): bool
+    public function insertTerm(Row | array $row, ?RowNormalizer $normalizer = null): int
     {
         // Normalize
         if ($row instanceof Row && $normalizer instanceof RowNormalizer) {
@@ -152,7 +152,7 @@ final class WPTermsLoader implements Loader
             }
         }
 
-        return true;
+        return $termId;
     }
 
     /**
@@ -222,9 +222,12 @@ final class WPTermsLoader implements Loader
             $sanitized['term.taxonomy'] = sanitize_key($data['term.taxonomy']);
         }
 
-        // Sanitize term name
+        // Handle term name
         if (isset($data['term.name'])) {
-            $sanitized['term.name'] = sanitize_text_field($data['term.name']);
+            $name = trim($data['term.name']);
+            // Strip invalid UTF-8 characters
+            $name = iconv('UTF-8', 'UTF-8//IGNORE', $name);
+            $sanitized['term.name'] = wp_strip_all_tags($name);
         }
 
         // Sanitize term slug
@@ -234,7 +237,7 @@ final class WPTermsLoader implements Loader
 
         // Sanitize term description (can contain limited HTML)
         if (isset($data['term.description'])) {
-            $sanitized['term.description'] = wp_kses_post($data['term.description']);
+            $sanitized['term.description'] = sanitize_textarea_field($data['term.description']);
         }
 
         // Sanitize parent term ID if present

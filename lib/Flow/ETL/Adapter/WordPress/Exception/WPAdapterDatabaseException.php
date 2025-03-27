@@ -28,7 +28,7 @@ class WPAdapterDatabaseException extends RuntimeException
      */
     public static function fromWPError(\WP_Error $wpError, ?string $message = null): self
     {
-        $errorMessage = $message ?? 'WordPress operation failed: ' . $wpError->get_error_message();
+        $errorMessage = 'WordPress operation failed: ' . $wpError->get_error_message() ?? $message;
         $exception = new self($errorMessage);
         $exception->wpError = $wpError;
 

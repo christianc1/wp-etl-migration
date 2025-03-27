@@ -136,7 +136,7 @@ class Orchestrator {
 			return $this;
 		}
 
-		$extraction_pipeline = new $configured_pipeline( $this->state, new LedgerRegistry( $this->config ) );
+		$extraction_pipeline = new $configured_pipeline( $this->state, $this->config, $this->job_config );
 		$this->state         = $extraction_pipeline->run()->get_final_state();
 
 		return $this;
