@@ -11,7 +11,7 @@ namespace TenupETL\Classes\Load\Loaders;
 
 use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 
-use Flow\ETL\{FlowContext, Loader, Rows};
+use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use function Flow\ETL\DSL\{integer_entry, rows_to_array};
 use TenupETL\Classes\Config\GlobalConfig;
 use Flow\ETL\Adapter\WordPress\Loaders\{WPPostsLoader, WPPostMetaLoader};
@@ -79,6 +79,17 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 
 		foreach ( $rows as $row ) {
 			try {
+				if ( isset( $this->step_config['skip_existing'] ) && $this->step_config['skip_existing'] ) {
+					// Check for existing post
+					$existing_post = $this->post_exists( $row );
+					if ( $existing_post ) {
+						$this->log( 'Skipping existing post: ' . $row->valueOf( 'post.post_title' ), 'progress' );
+
+						$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $existing_post ) ) );
+						continue;
+					}
+				}
+
 				$post_id = $this->posts_adapter->insertPost( $row, normalizer: $normalizer );
 			} catch ( \Exception $e ) {
 				$this->log( 'Error inserting post: ' . $row->valueOf( 'post.post_title' ), 'warning' );
@@ -100,5 +111,29 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 			}
 			$this->log( 'Loaded ' . $row->valueOf( 'post.post_title' ) . ' as WP_Post ' . $post_id, 'progress' );
 		}
+	}
+
+	private function post_exists( Row $row ): int {
+		$post_id = $row->has( 'post.ID' ) ? $row->valueOf( 'post.ID' ) : null;
+		if ( $post_id ) {
+			return $post_id;
+		}
+
+		$post_name = $row->has( 'post.post_name' ) ? $row->valueOf( 'post.post_name' ) : null;
+		if ( $post_name ) {
+			$args = [
+				'name' => $post_name,
+				'post_type' => $row->valueOf( 'post.post_type' ),
+				'posts_per_page' => 1,
+			];
+
+			$query = get_posts( $args );
+
+			if ( $query ) {
+				return $query[0]->ID;
+			}
+		}
+
+		return 0;
 	}
 }

@@ -83,7 +83,7 @@ function to_slug( mixed $ref, ScalarFunction|string $prefix = '' ): ScalarFuncti
  * @param ScalarFunction|string $ref       The reference to the string to explode.
  * @return ScalarFunction The explode transformer.
  */
-function to_explode( ScalarFunction|string $delimeter = ',', ScalarFunction|string $ref, ): ScalarFunction {
+function to_explode( ScalarFunction|string $delimeter = ',', ScalarFunction|string $ref = '', ): ScalarFunction {
 	return new Explode( $ref, $delimeter );
 }
 
