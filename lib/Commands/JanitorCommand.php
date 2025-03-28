@@ -203,8 +203,22 @@ class JanitorCommand extends BaseCommand {
 	 * [--taxonomy=<taxonomies>]
 	 * : List of taxonomies to delete separated by comma.
 	 *
+	 * [--batch-size=<batch-size>]
+	 * : Number of terms to delete in a single batch. Defaults to 100.
+	 *
 	 * [--yes]
-	 * : Proceed to delete the terms without a confirmation prompt.
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Delete all terms of taxonomy 'category'
+	 *     $ wp etl janitor empty-terms --taxonomy=category
+	 *
+	 *     # Delete all terms of taxonomies 'category' and 'post_tag' without confirmation
+	 *     $ wp etl janitor empty-terms --taxonomy=category,post_tag --yes
+	 *
+	 *     # Delete terms in larger batches (500 at a time)
+	 *     $ wp etl janitor empty-terms --taxonomy=category --batch-size=500
 	 *
 	 * @param array $args       Command arguments.
 	 * @param array $assoc_args Command associative arguments.
@@ -212,37 +226,91 @@ class JanitorCommand extends BaseCommand {
 	 * @subcommand empty-terms
 	 */
 	public function empty_terms( $args, $assoc_args ) {
+		global $wpdb;
+
+		// Get parameters
 		$taxonomy = (string) WP_CLI\Utils\get_flag_value( $assoc_args, 'taxonomy', '' );
+		$batch_size = (int) WP_CLI\Utils\get_flag_value( $assoc_args, 'batch-size', 100 );
 
 		if ( empty( $taxonomy ) ) {
-			WP_CLI::error( 'Please provide one (or more) taxonomies separated by a comma.' );
+			WP_CLI::error( 'Please provide one or more taxonomies separated by comma using --taxonomy parameter.' );
 		}
 
-		$options    = array(
-			'return'     => true,
-			'parse'      => 'json',
-			'launch'     => false,
-			'exit_error' => true,
-		);
-		$_terms_ids = WP_CLI::runcommand(
-			sprintf(
-				'term list %s --field=term_id --format=json',
-				$taxonomy
-			),
-			$options
+		// Get taxonomies array
+		$taxonomies = explode( ',', $taxonomy );
+		$placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
+
+		// Get total term count directly from database for reliability
+		$query = $wpdb->prepare(
+			"SELECT COUNT(*) FROM $wpdb->term_taxonomy WHERE taxonomy IN ($placeholders)",
+			$taxonomies
 		);
 
-		if ( empty( $_terms_ids ) ) {
-			WP_CLI::warning( 'No terms found.' );
+		$total_count = (int) $wpdb->get_var( $query );
+
+		if ( 0 === $total_count ) {
+			WP_CLI::warning( 'No terms found for the specified taxonomy/taxonomies.' );
 			return;
 		}
 
-		WP_CLI::confirm( sprintf( 'Are you sure you want to delete %d terms?', count( $_terms_ids ) ), $assoc_args );
+		// Confirm deletion
+		WP_CLI::confirm(
+			sprintf( 'You are about to delete all %d terms from taxonomy/taxonomies "%s". Continue?', $total_count, $taxonomy ),
+			$assoc_args
+		);
 
-		$_terms_ids = join( ' ', $_terms_ids );
+		// Set up progress display
+		$progress = \WP_CLI\Utils\make_progress_bar( 'Deleting terms', $total_count );
+		$deleted_count = 0;
+
+		// Start bulk operation
 		self::start_bulk_operation();
-		WP_CLI::runcommand( "term delete {$taxonomy} {$_terms_ids}", $options );
+
+		// Process in batches
+		$remaining = $total_count;
+
+		while ( $remaining > 0 ) {
+			// Get term IDs directly from database
+			$term_ids_query = $wpdb->prepare(
+				"SELECT t.term_id
+				FROM $wpdb->terms AS t
+				INNER JOIN $wpdb->term_taxonomy AS tt ON t.term_id = tt.term_id
+				WHERE tt.taxonomy IN ($placeholders)
+				LIMIT %d",
+				array_merge( $taxonomies, array( $batch_size ) )
+			);
+
+			$term_ids = $wpdb->get_col( $term_ids_query );
+
+			if ( empty( $term_ids ) ) {
+				break; // No more terms found
+			}
+
+			$current_batch_size = count( $term_ids );
+
+			// Delete terms in this batch
+			foreach ( $term_ids as $term_id ) {
+				foreach ( $taxonomies as $tax ) {
+					wp_delete_term( $term_id, $tax );
+				}
+				$deleted_count++;
+				$progress->tick();
+			}
+
+			$remaining -= $current_batch_size;
+
+			// Flush the cache periodically to avoid memory issues
+			if ( $deleted_count % 500 === 0 ) {
+				wp_cache_flush();
+			}
+		}
+
+		// End bulk operation
 		self::end_bulk_operation();
+		$progress->finish();
+
+		// Report success
+		WP_CLI::success( sprintf( 'Successfully deleted %d terms.', $deleted_count ) );
 	}
 
 	/**
