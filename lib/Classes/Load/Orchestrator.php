@@ -94,8 +94,9 @@ class Orchestrator {
 
 		// Run the pipeline.
 		$this->log( 'Running full pipeline...', 'progress' );
-		$this->get_current_state()->run();
-
+		// $report = $this->get_current_state()->run( analyze: true );
+		// $this->log( 'Row Count:' . $report->statistics()->totalRows(), 'progress' );
+		// $this->log( 'Execution Time:' . $report->statistics()->executionTime->highResolutionTime->toString(), 'progress' );
 		return $this;
 	}
 
@@ -114,8 +115,9 @@ class Orchestrator {
 			if ( $load_operation['loader'] === 'WP_Post_All' ) {
 				$all = true;
 				foreach ( $all_loaders as $loader ) {
-					$load_operation['loader'] = $loader;
-					array_push( $loaders, $this->adapter_factory->create( $load_operation ) );
+					$sub_load_operation = $load_operation;
+					$sub_load_operation['loader'] = $loader;
+					array_push( $loaders, $this->adapter_factory->create( $sub_load_operation ) );
 				}
 				continue;
 			}

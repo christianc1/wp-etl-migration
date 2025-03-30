@@ -79,14 +79,13 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 
 		foreach ( $rows as $row ) {
 			try {
-				if ( isset( $this->step_config['skip_existing'] ) && $this->step_config['skip_existing'] ) {
+				if ( isset( $this->step_config['upsert'] ) && $this->step_config['upsert'] ) {
 					// Check for existing post
 					$existing_post = $this->post_exists( $row );
 					if ( $existing_post ) {
-						$this->log( 'Skipping existing post: ' . $row->valueOf( 'post.post_title' ), 'progress' );
+						$this->log( 'Updating post: ' . $row->valueOf( 'post.post_title' ), 'progress' );
 
 						$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $existing_post ) ) );
-						continue;
 					}
 				}
 
@@ -98,7 +97,9 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 			}
 
 			// Add post_id to the row
-			$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $post_id ) ) );
+			if ( ! $row->has( 'post.ID' ) ) {
+				$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $post_id ) ) );
+			}
 
 			// Handle thumbnail
 			if ( isset( $post_meta['_remote_featured_media'] ) && $post_meta['_remote_featured_media'] ) {
