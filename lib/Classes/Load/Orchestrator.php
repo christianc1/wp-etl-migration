@@ -94,9 +94,7 @@ class Orchestrator {
 
 		// Run the pipeline.
 		$this->log( 'Running full pipeline...', 'progress' );
-		// $report = $this->get_current_state()->run( analyze: true );
-		// $this->log( 'Row Count:' . $report->statistics()->totalRows(), 'progress' );
-		// $this->log( 'Execution Time:' . $report->statistics()->executionTime->highResolutionTime->toString(), 'progress' );
+		$this->get_current_state()->run();
 		return $this;
 	}
 
