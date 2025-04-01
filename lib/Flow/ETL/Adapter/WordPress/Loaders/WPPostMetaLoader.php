@@ -110,6 +110,7 @@ final class WPPostMetaLoader implements Loader
 
         // Process all meta.* entries
         $metaUpdated = false;
+
         foreach ($sanitizedData as $key => $value) {
             if (str_starts_with($key, 'meta.')) {
                 $metaKey = sanitize_key(substr($key, 5)); // Remove 'meta.' prefix and sanitize
@@ -117,14 +118,7 @@ final class WPPostMetaLoader implements Loader
                 // Sanitize meta value based on type
                 $sanitizedValue = $this->sanitizeMetaValue($value);
 
-                $result = update_post_meta(absint($postId), $metaKey, $sanitizedValue);
-
-                if (false === $result && !is_null($result)) {
-                    throw new WPAdapterDatabaseException(
-                        "Failed to update post meta for post ID {$postId} with key {$metaKey}"
-                    );
-                }
-
+                update_post_meta(absint($postId), $metaKey, $sanitizedValue);
                 $metaUpdated = true;
             }
         }
