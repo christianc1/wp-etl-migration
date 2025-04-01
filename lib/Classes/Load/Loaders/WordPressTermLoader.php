@@ -11,7 +11,7 @@ namespace TenupETL\Classes\Load\Loaders;
 
 use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 
-use Flow\ETL\{FlowContext, Loader, Rows};
+use Flow\ETL\{FlowContext, Loader, Rows, Row};
 use function Flow\ETL\DSL\{integer_entry, rows_to_array};
 use TenupETL\Classes\Config\GlobalConfig;
 use Flow\ETL\Adapter\WordPress\Loaders\{WPTermsLoader};
@@ -78,8 +78,24 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 
 		foreach ( $rows as $row ) {
 			try {
+				$this->log( 'Processing term: ' . $row->valueOf( 'term.name' ), 'progress' );
+				if ( isset( $this->step_config['upsert'] ) && $this->step_config['upsert'] ) {
+					// Check for existing post
+					$existing_term = $this->term_exists( $row );
+					if ( $existing_term ) {
+						$this->log( 'Updating term: ' . $row->valueOf( 'term.name' ), 'progress' );
+
+						$row = $this->mutate_row( $row->add( integer_entry( 'term.term_id', $existing_term ) ) );
+					}
+				}
 				$term_id = $this->terms_adapter->insertTerm( $row, normalizer: $normalizer );
 			} catch ( \Exception $e ) {
+				if ( isset ( $this->step_config['upsert'] ) && $this->step_config['upsert'] ) {
+					$this->log( 'Error upserting term: ' . $row->valueOf( 'term.name' ), 'warning' );
+					$this->log( $e->getMessage(), 'warning' );
+					continue;
+				}
+
 				$this->log( 'Error inserting term: ' . $row->valueOf( 'term.name' ), 'warning' );
 				$this->log( $e->getMessage(), 'warning' );
 				$this->mutate_row( $row->add( integer_entry( 'term.term_id', 0 ) ) );
@@ -87,7 +103,40 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 			}
 
 			// Add term_id to the row
-			$row = $this->mutate_row( $row->add( integer_entry( 'term.term_id', $term_id ) ) );
+			if ( ! $row->has( 'term.term_id' ) ) {
+				$row = $this->mutate_row( $row->add( integer_entry( 'term.term_id', $term_id ) ) );
+			}
 		}
+	}
+
+	/**
+	 * Check if the term exists
+	 *
+	 * @param Row $row The row to check.
+	 * @return int|false The term ID if it exists, false otherwise.
+	 */
+	protected function term_exists( Row $row ): int {
+		$term_id = $row->has( 'term.term_id' ) ? $row->valueOf( 'term.term_id' ) : 0;
+		if ( $term_id ) {
+			return $term_id;
+		}
+
+		$term_name = $row->valueOf( 'term.name' );
+		$term_slug = $row->valueOf( 'term.slug' );
+		$term_taxonomy = $row->valueOf( 'term.taxonomy' );
+
+		$term = get_term_by( 'name', $term_name, $term_taxonomy );
+
+		if ( $term ) {
+			return $term->term_id;
+		}
+
+		$term = get_term_by( 'slug', $term_slug, $term_taxonomy );
+		if ( $term ) {
+			return $term->term_id;
+		}
+
+		return 0;
+
 	}
 }
