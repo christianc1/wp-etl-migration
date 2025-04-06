@@ -87,9 +87,7 @@ class BaseLoader implements Loader, Closure {
 	 * @param FlowContext $context Flow context.
 	 * @return void
 	 */
-	public function load( Rows $rows, FlowContext $context ): void {
-		$this->loaded_rows = $rows;
-	}
+	public function load( Rows $rows, FlowContext $context ): void {}
 
 	/**
 	 * Closure method for the loader
@@ -99,9 +97,7 @@ class BaseLoader implements Loader, Closure {
 	 * @param FlowContext $context Flow context.
 	 * @return void
 	 */
-	public function closure( FlowContext $context ): void {
-		$this->loaded_rows = null;
-	}
+	public function closure( FlowContext $context ): void {}
 
 	/**
 	 * Reduce a row to only fields with a given prefix

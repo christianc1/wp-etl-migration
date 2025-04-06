@@ -52,24 +52,14 @@ class PipelineJob {
 	public $state;
 
 	/**
-	 * Ledger registry instance
-	 *
-	 * @var LedgerRegistry
-	 */
-	protected $ledger_registry;
-
-	/**
 	 * Constructor
 	 *
 	 * @param GlobalConfig   $config          Global configuration object.
 	 * @param JobConfig      $job_config      Job configuration object.
 	 * @param LedgerRegistry $ledger_registry Ledger registry instance.
 	 */
-	public function __construct( GlobalConfig $config, JobConfig $job_config, LedgerRegistry $ledger_registry ) {
-		$this->config          = $config;
-		$this->job_config      = $job_config;
-		$this->ledger_registry = $ledger_registry;
-		$this->state           = data_frame();
+	public function __construct( public GlobalConfig $config, public JobConfig $job_config, public LedgerRegistry $ledger_registry ) {
+		$this->state = data_frame();
 	}
 
 	/**

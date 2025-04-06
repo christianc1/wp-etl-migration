@@ -24,6 +24,13 @@ use Flow\ETL\DSL\{from_array};
 abstract class BaseTransformationPipeline implements TransformationPipeline {
 
 	/**
+	 * The unique identifier for the transformation pipeline.
+	 *
+	 * @var string
+	 */
+	protected $uid;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param DataFrame      $state           The initial state of the transformation pipeline.

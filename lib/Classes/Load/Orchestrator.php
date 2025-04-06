@@ -48,11 +48,25 @@ class Orchestrator {
 	protected $step_config;
 
 	/**
+	 * Loaders for the current load step
+	 *
+	 * @var array
+	 */
+	protected $loaders;
+
+	/**
 	 * Adapter factory instance
 	 *
 	 * @var AdapterFactory
 	 */
 	protected $adapter_factory;
+
+	/**
+	 * Synchronous loader instance
+	 *
+	 * @var SynchronousPipelineLoader
+	 */
+	protected $synchronous_loader;
 
 	/**
 	 * Constructor

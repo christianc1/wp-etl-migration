@@ -129,9 +129,9 @@ class Orchestrator {
 			$this->state = $this->normalizer->prefix( $this->state, $extraction['prefix'] );
 		}
 
-		$configured_pipeline = $extraction['pipeline'];
+		$configured_pipeline = $extraction['pipeline'] ?? null;
 
-		if ( ! class_exists( $configured_pipeline ) ) {
+		if ( ! $configured_pipeline || ! class_exists( $configured_pipeline ) ) {
 			$this->log( 'ExtractionPipeline not found: ' . $this->job_config->get_value( 'name' ), 'warning' );
 			return $this;
 		}

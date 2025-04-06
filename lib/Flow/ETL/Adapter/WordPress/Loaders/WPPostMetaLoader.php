@@ -176,6 +176,7 @@ final class WPPostMetaLoader implements Loader
             // For strings, use appropriate sanitization
             if (strpos($value, '<') !== false && strpos($value, '>') !== false) {
                 // If it looks like HTML, use wp_kses_post
+				return $value;
                 return wp_kses_post($value);
             } else {
                 // Otherwise use standard text sanitization

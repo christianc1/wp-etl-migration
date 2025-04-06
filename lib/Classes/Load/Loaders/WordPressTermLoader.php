@@ -45,8 +45,8 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 	) {
 		parent::__construct( $step_config, $global_config );
 
-		$this->terms_adapter = new WPTermsLoader( $step_config['args'] ?? [] );
-		$this->terms_adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
+		$this->adapter = new WPTermsLoader( $step_config['args'] ?? [] );
+		$this->adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
 	}
 
 	/**
@@ -72,7 +72,7 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 	 * @return void
 	 */
 	public function load( Rows $rows, FlowContext $context ): void {
-		$normalizer = $this->terms_adapter->create_normalizer( $context );
+		$normalizer = $this->adapter->create_normalizer( $context );
 		$processed_count = 0;
 		$memory_cleanup_interval = 10; // Clean up memory every X posts
 
@@ -88,7 +88,7 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 						$row = $this->mutate_row( $row->add( integer_entry( 'term.term_id', $existing_term ) ) );
 					}
 				}
-				$term_id = $this->terms_adapter->insertTerm( $row, normalizer: $normalizer );
+				$term_id = $this->adapter->insertTerm( $row, normalizer: $normalizer );
 			} catch ( \Exception $e ) {
 				if ( isset ( $this->step_config['upsert'] ) && $this->step_config['upsert'] ) {
 					$this->log( 'Error upserting term: ' . $row->valueOf( 'term.name' ), 'warning' );
@@ -121,22 +121,26 @@ class WordPressTermLoader extends BaseLoader implements Loader, RowMutator {
 			return $term_id;
 		}
 
-		$term_name = $row->valueOf( 'term.name' );
-		$term_slug = $row->valueOf( 'term.slug' );
-		$term_taxonomy = $row->valueOf( 'term.taxonomy' );
-
-		$term = get_term_by( 'name', $term_name, $term_taxonomy );
-
-		if ( $term ) {
-			return $term->term_id;
+		if ( $row->has( 'term.taxonomy' ) ) {
+			$term_taxonomy = $row->valueOf( 'term.taxonomy' );
+		} else {
+			return 0;
 		}
 
-		$term = get_term_by( 'slug', $term_slug, $term_taxonomy );
+		if ( $row->has( 'term.slug' ) ) {
+			$term_slug = $row->valueOf( 'term.slug' );
+			$term = get_term_by( 'slug', $term_slug, $term_taxonomy );
+		}
+
+		if ( $row->has( 'term.name' ) ) {
+			$term_name = $row->valueOf( 'term.name' );
+			$term = get_term_by( 'name', $term_name, $term_taxonomy );
+		}
+
 		if ( $term ) {
 			return $term->term_id;
 		}
 
 		return 0;
-
 	}
 }

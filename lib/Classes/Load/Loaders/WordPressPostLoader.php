@@ -46,8 +46,8 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 	) {
 		parent::__construct( $step_config, $global_config );
 
-		$this->posts_adapter = new WPPostsLoader( $step_config['args'] ?? [] );
-		$this->posts_adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
+		$this->adapter = new WPPostsLoader( $step_config['args'] ?? [] );
+		$this->adapter->withDateTimeFormat( \DateTimeInterface::ATOM );
 	}
 
 	/**
@@ -73,7 +73,7 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 	 * @return void
 	 */
 	public function load( Rows $rows, FlowContext $context ): void {
-		$normalizer = $this->posts_adapter->create_normalizer( $context );
+		$normalizer = $this->adapter->create_normalizer( $context );
 		$processed_count = 0;
 		$memory_cleanup_interval = 10; // Clean up memory every X posts
 
@@ -89,7 +89,7 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 					}
 				}
 
-				$post_id = $this->posts_adapter->insertPost( $row, normalizer: $normalizer );
+				$post_id = $this->adapter->insertPost( $row, normalizer: $normalizer );
 			} catch ( \Exception $e ) {
 				$this->log( 'Error inserting post: ' . $row->valueOf( 'post.post_title' ), 'warning' );
 				$this->log( $e->getMessage(), 'warning' );
