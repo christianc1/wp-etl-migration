@@ -78,7 +78,7 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 				// Mutate the row with the updated values
 				$row = $this->mutate_row( $updated_row );
 			} catch ( \Exception $e ) {
-				$this->log( 'Error processing media: ' . $e->getMessage(), 'warning' );
+				$this->mutate_row( $row );
 				continue;
 			}
 		}
