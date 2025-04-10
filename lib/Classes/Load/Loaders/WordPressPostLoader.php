@@ -12,7 +12,7 @@ namespace TenupETL\Classes\Load\Loaders;
 use TenupETL\Utils\{ WithLogging, WithSideLoadMedia };
 
 use Flow\ETL\{FlowContext, Loader, Rows, Row};
-use function Flow\ETL\DSL\{integer_entry, rows_to_array};
+use function Flow\ETL\DSL\{integer_entry, rows_to_array, string_entry};
 use TenupETL\Classes\Config\GlobalConfig;
 use Flow\ETL\Adapter\WordPress\Loaders\{WPPostsLoader, WPPostMetaLoader};
 
@@ -78,6 +78,8 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 		$memory_cleanup_interval = 10; // Clean up memory every X posts
 
 		foreach ( $rows as $row ) {
+			$row = $this->remove_skip_fields( $row );
+
 			try {
 				if ( isset( $this->step_config['upsert'] ) && $this->step_config['upsert'] ) {
 					// Check for existing post
@@ -114,6 +116,57 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 		}
 	}
 
+	/**
+	 * Remove skip fields from the row
+	 *
+	 * @param Row $row The row to remove skip fields from.
+	 * @return Row The row with skip fields removed.
+	 */
+	protected function remove_skip_fields( Row $row ): Row {
+		if ( ! isset( $this->step_config['skip_fields'] ) || empty( $this->step_config['skip_fields'] ) ) {
+			return $row;
+		}
+
+		$fields = $this->step_config['skip_fields'];
+		$fields = array_merge(
+			$fields,
+			array_map( fn( $field ) => 'post.' . $field, $fields )
+		);
+
+		foreach ( $fields as $field ) {
+			if ( $row->has( $field ) ) {
+				$row = $row->remove( $field );
+			}
+		}
+
+		// Post title and post content are required fields.
+		$post = get_post( $this->post_exists( $row ) );
+		if ( in_array( 'post.post_title', $fields ) ) {
+
+			if ( $post ) {
+				$row = $row->add( string_entry( 'post.post_title', $post->post_title ) );
+			} else {
+				$row = $row->add( string_entry( 'post.post_title', 'New ' . $this->valueOf( 'post.post_type' ) ) );
+			}
+		}
+
+		if ( in_array( 'post.post_content', $fields ) ) {
+			if ( $post ) {
+				$row = $row->add( string_entry( 'post.post_content', $post->post_content ) );
+			} else {
+				$row = $row->add( string_entry( 'post.post_content', 'Empty content for ' . $this->valueOf( 'post.post_type' ) ) );
+			}
+		}
+
+		return $row;
+	}
+
+	/**
+	 * Check if the post exists
+	 *
+	 * @param Row $row The row to check if the post exists.
+	 * @return int The post ID if the post exists, 0 otherwise.
+	 */
 	private function post_exists( Row $row ): int {
 		$post_id = $row->has( 'post.ID' ) ? $row->valueOf( 'post.ID' ) : null;
 		if ( $post_id ) {

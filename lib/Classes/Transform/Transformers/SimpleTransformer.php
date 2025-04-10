@@ -47,8 +47,6 @@ final class SimpleTransformer implements ScalarFunction, Transformer {
 	}
 
 	public function transform( Rows $rows, FlowContext $context ): Rows {
-		$rows->each( fn( Row $row ) => $this->eval( $row ) );
-
-		return $rows;
+		return $rows->map( fn( Row $row ) => $this->eval( $row ) );
 	}
 }

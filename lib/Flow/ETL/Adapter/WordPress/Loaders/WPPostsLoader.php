@@ -104,22 +104,37 @@ final class WPPostsLoader implements Loader
         // Sanitize input data
         $sanitizedData = $this->sanitizePostData($data);
 
-        $postData = array_merge($this->postDefaults, array_filter([
-            'post_title' => $sanitizedData['post.post_title'] ?? '',
-            'post_content' => $sanitizedData['post.post_content'] ?? '',
-            'post_excerpt' => $sanitizedData['post.post_excerpt'] ?? '',
-            'post_name' => $sanitizedData['post.post_name'] ?? '',
-            'post_status' => $sanitizedData['post.post_status'] ?? $this->postDefaults['post_status'],
-            'post_type' => $sanitizedData['post.post_type'] ?? $this->postDefaults['post_type'],
-            'post_author' => $sanitizedData['post.post_author'] ?? $this->postDefaults['post_author'],
-            'post_date' => $sanitizedData['post.post_date'] ?? current_time('mysql'),
-            'post_date_gmt' => $sanitizedData['post.post_date_gmt'] ?? get_gmt_from_date($sanitizedData['post.post_date'] ?? current_time('mysql')),
-        ]));
-
         // Handle post ID if provided (update existing post)
         $postId = $sanitizedData['post.ID'] ?? $sanitizedData['post.id'] ?? null;
+
+        // Prepare post data differently for updates vs new posts
         if (!empty($postId)) {
-            $postData['ID'] = (int) $postId;
+            // For updates, only include explicitly provided fields
+            $postData = array_filter([
+                'ID' => (int) $postId,
+                'post_title' => $sanitizedData['post.post_title'] ?? null,
+                'post_content' => $sanitizedData['post.post_content'] ?? null,
+                'post_excerpt' => $sanitizedData['post.post_excerpt'] ?? null,
+                'post_name' => $sanitizedData['post.post_name'] ?? null,
+                'post_status' => $sanitizedData['post.post_status'] ?? null,
+                'post_type' => $sanitizedData['post.post_type'] ?? null,
+                'post_author' => $sanitizedData['post.post_author'] ?? null,
+                'post_date' => $sanitizedData['post.post_date'] ?? null,
+                'post_date_gmt' => $sanitizedData['post.post_date_gmt'] ?? null,
+            ], function($value) { return $value !== null; });
+        } else {
+            // For new posts, merge with defaults
+            $postData = array_merge($this->postDefaults, array_filter([
+                'post_title' => $sanitizedData['post.post_title'] ?? '',
+                'post_content' => $sanitizedData['post.post_content'] ?? '',
+                'post_excerpt' => $sanitizedData['post.post_excerpt'] ?? '',
+                'post_name' => $sanitizedData['post.post_name'] ?? '',
+                'post_status' => $sanitizedData['post.post_status'] ?? $this->postDefaults['post_status'],
+                'post_type' => $sanitizedData['post.post_type'] ?? $this->postDefaults['post_type'],
+                'post_author' => $sanitizedData['post.post_author'] ?? $this->postDefaults['post_author'],
+                'post_date' => $sanitizedData['post.post_date'] ?? current_time('mysql'),
+                'post_date_gmt' => $sanitizedData['post.post_date_gmt'] ?? get_gmt_from_date($sanitizedData['post.post_date'] ?? current_time('mysql')),
+            ]));
         }
 
         $postId = wp_insert_post($postData, true);

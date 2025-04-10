@@ -18,6 +18,13 @@ use Flow\ETL\Row\EntryFactory;
 final class StringToNullTransformer implements Transformer {
 
 	/**
+	 * The entry factory.
+	 *
+	 * @var EntryFactory
+	 */
+	protected $entry_factory;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string $prefix The prefix to add to entry names.
