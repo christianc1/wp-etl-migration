@@ -48,6 +48,7 @@ class BaseCommand extends WP_CLI_Command {
 	 * {@inheritDoc}
 	 */
 	public static function start_bulk_operation() {
+		define( 'WP_IMPORTING', true );
 		\wp_defer_term_counting( true );
 		\wp_defer_comment_counting( true );
 		\wp_suspend_cache_invalidation( true );

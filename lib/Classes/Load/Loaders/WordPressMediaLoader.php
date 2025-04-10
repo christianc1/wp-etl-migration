@@ -78,7 +78,9 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 				// Mutate the row with the updated values
 				$row = $this->mutate_row( $updated_row );
 			} catch ( \Exception $e ) {
-				$this->mutate_row( $row );
+				// Even if media loading fails, we still want to replace placeholders with empty values
+				$updated_row = $this->replaceMediaPlaceholders( $row, [] );
+				$row = $this->mutate_row( $updated_row );
 				continue;
 			}
 		}
@@ -115,19 +117,28 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 							(string)$attachments[$key],
 							$new_value
 						);
+					} else {
+						// Replace missing attachment placeholder with empty string
+						$new_value = str_replace(
+							"%%{$placeholder}%%",
+							'',
+							$new_value
+						);
 					}
 				}
 
 				// Only update if replacements were made
 				if ( $new_value !== $value ) {
 					// Create appropriate entry type based on context
-					if ( is_numeric( $new_value ) ) {
+					if ( is_numeric( $new_value ) && !empty( $new_value ) ) {
 						$new_entry = integer_entry( $entry->name(), (int)$new_value );
 					} else {
 						$new_entry = string_entry( $entry->name(), $new_value );
 					}
 
 					$updated_row = $updated_row->remove( $entry->name() )->add( $new_entry );
+				} else {
+					$updated_row = $updated_row->remove( $entry->name() );
 				}
 			}
 		}
