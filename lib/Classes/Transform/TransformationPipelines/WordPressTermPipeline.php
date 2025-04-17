@@ -111,7 +111,8 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 			->term_description()
 			->term_alias_of()
 			->term_meta()
-			->ledger_records();
+			->ledger_records()
+			->finalize();
 
 		return $this;
 	}
@@ -198,6 +199,10 @@ class WordPressTermPipeline extends BaseTransformationPipeline {
 	 * @return TransformationPipeline The pipeline instance.
 	 */
 	protected function ledger_records(): TransformationPipeline {
+		return $this;
+	}
+
+	public function finalize(): TransformationPipeline {
 		return $this;
 	}
 }

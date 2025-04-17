@@ -118,15 +118,28 @@ final class WPTermsLoader implements Loader
         }
 
         // Insert or update the term
-        $termData = wp_insert_term(
-            $name,
-            $taxonomy,
-            [
-                'slug' => $slug,
-                'description' => $sanitizedData['term.description'] ?? '',
-                'parent' => $parentTermId,
-            ]
-        );
+		if ( isset( $sanitizedData['term.term_id'] ) ) {
+			$termData = wp_update_term(
+				$sanitizedData['term.term_id'],
+				$taxonomy,
+				[
+					'name' => $name,
+					'slug' => $slug,
+					'description' => $sanitizedData['term.description'] ?? '',
+					'parent' => $parentTermId,
+				]
+			);
+		} else {
+			$termData = wp_insert_term(
+				$name,
+				$taxonomy,
+				[
+					'slug' => $slug,
+					'description' => $sanitizedData['term.description'] ?? '',
+					'parent' => $parentTermId,
+				]
+			);
+		}
 
         if (is_wp_error($termData)) {
             // If term already exists, try to get its ID

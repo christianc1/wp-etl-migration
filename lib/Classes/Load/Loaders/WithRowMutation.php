@@ -15,7 +15,7 @@ trait WithRowMutation {
 
 	public $has_mutated_rows = false;
 
-	public function mutate_row( Row $row ): Row {
+	 public function mutate_row( Row $row ): Row {
 		// All rows should have a unique ID
 		$uid = (string) $row->valueOf( 'etl.uid' );
 

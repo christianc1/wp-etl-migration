@@ -47,18 +47,39 @@ class LocalFileSystemExtractor implements ExtractorInterface {
 			return null;
 		}
 
+		$file_path = $config['file'];
 		$full_path = TENUP_ETL_PLUGIN_DIR . '/' . $this->base_path;
 
-		$this->log( "Searching for file {$config['file']} in {$full_path}", 'debug' );
+		$this->log( "Searching for file {$file_path} in {$full_path}", 'debug' );
 
-		$finder = new Finder();
-		$finder
-			->files()
-			->name( $config['file'] )
-			->in( $full_path );
+		// Handle file paths with directories
+		if ( strpos( $file_path, '/' ) !== false ) {
+			// Split the path into directory and filename
+			$path_parts = explode( '/', ltrim( $file_path, '/' ) );
+			$filename = array_pop( $path_parts );
+			$subdirectory = implode( '/', $path_parts );
+
+			// Update the full path to include the subdirectory
+			$full_path = $full_path . '/' . $subdirectory;
+
+			$this->log( "Looking for file {$filename} in subdirectory {$subdirectory}", 'debug' );
+
+			$finder = new Finder();
+			$finder
+				->files()
+				->name( $filename )
+				->in( $full_path );
+		} else {
+			// Original behavior for simple filenames
+			$finder = new Finder();
+			$finder
+				->files()
+				->name( $file_path )
+				->in( $full_path );
+		}
 
 		if ( ! $finder->hasResults() ) {
-			$this->log( "File not found: {$config['file']} in {$full_path}", 'error' );
+			$this->log( "File not found: {$file_path} in {$full_path}", 'error' );
 			return null;
 		}
 

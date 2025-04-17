@@ -64,7 +64,22 @@ final class WPTermExtractor implements Extractor, LimitableExtractor
                 $termData = $this->normalizeTerm($term);
 
                 if ($this->includeMeta) {
-                    $termData['meta'] = get_term_meta($term->term_id);
+                    $term_meta = get_term_meta($term->term_id);
+					$termData['meta'] = array_filter($term_meta, function($value) {
+						if ($value === null) {
+							return false;
+						}
+
+						if (is_array($value)) {
+							// Filter out arrays that contain only null values
+							$filtered = array_filter($value, function($item) {
+								return $item !== null;
+							});
+							return !empty($filtered);
+						}
+
+						return true;
+					});
                 }
 
                 if ($shouldPutInputIntoRows) {
