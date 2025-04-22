@@ -100,25 +100,25 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 			$value = $entry->value();
 
 			// Skip if not a string or doesn't contain placeholder pattern
-			if ( !is_string( $value ) || !str_contains( $value, '%%' ) ) {
+			if ( ! is_string( $value ) || ! str_contains( $value, '%%' ) ) {
 				continue;
 			}
 
-			// Find all placeholders matching %%media.*.attachment_id%%
+			// Find all placeholders matching %%...%%
 			if ( preg_match_all( '/%%([^%]+)%%/', $value, $matches ) ) {
 				$new_value = $value;
 
 				foreach ( $matches[1] as $placeholder ) {
-					$key = $placeholder . '.attachment_id';
-					if ( isset( $attachments[$key] ) ) {
-						// Replace placeholder with actual attachment ID
+					// The placeholder variable contains the full key (e.g., 'media.featured_image.url')
+					if ( isset( $attachments[ $placeholder ] ) ) {
+						// Replace placeholder with the actual value (ID or URL) from attachments array
 						$new_value = str_replace(
 							"%%{$placeholder}%%",
-							(string)$attachments[$key],
+							(string) $attachments[ $placeholder ],
 							$new_value
 						);
 					} else {
-						// Replace missing attachment placeholder with empty string
+						// Replace placeholder with empty string if value not found in attachments
 						$new_value = str_replace(
 							"%%{$placeholder}%%",
 							'',
@@ -130,14 +130,15 @@ class WordPressMediaLoader extends BaseLoader implements Loader, RowMutator {
 				// Only update if replacements were made
 				if ( $new_value !== $value ) {
 					// Create appropriate entry type based on context
-					if ( is_numeric( $new_value ) && !empty( $new_value ) ) {
-						$new_entry = integer_entry( $entry->name(), (int)$new_value );
+					// Convert to integer if the final value is purely numeric and the placeholder indicates an ID
+					if ( ctype_digit( $new_value ) && ! empty( $new_value ) && str_ends_with( $placeholder, '.attachment_id' ) ) {
+						$new_entry = integer_entry( $entry->name(), (int) $new_value );
 					} else {
 						$new_entry = string_entry( $entry->name(), $new_value );
 					}
-
 					$updated_row = $updated_row->remove( $entry->name() )->add( $new_entry );
-				} else {
+				} elseif ( empty( $new_value ) && $value !== $new_value ) {
+					// Also remove the entry if the placeholder existed but replacement resulted in an empty string
 					$updated_row = $updated_row->remove( $entry->name() );
 				}
 			}

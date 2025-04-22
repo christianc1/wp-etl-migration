@@ -128,6 +128,13 @@ final class WPMediaLoader implements Loader
                     // For specific media (e.g., 'featured_image'), use 'media.featured_image.attachment_id'
                     $result_key = ($media_key === 'default') ? 'media.attachment_id' : "media.{$media_key}.attachment_id";
                     $results[$result_key] = $attachment_id;
+
+                    // Add Attachment URL
+                    $url = wp_get_attachment_url($attachment_id);
+                    if ($url) {
+                        $url_key = ($media_key === 'default') ? 'media.url' : "media.{$media_key}.url";
+                        $results[$url_key] = $url;
+                    }
                 }
             } catch (RuntimeException $e) {
                 // Log error but continue processing other media
