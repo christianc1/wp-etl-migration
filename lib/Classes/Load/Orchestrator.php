@@ -122,7 +122,7 @@ class Orchestrator {
 		foreach ( $this->step_config as $load_operation ) {
 			// Often when loading posts, you want to run post, media, meta, and terms all at once.
 			// This is a helper function to do that.
-			$all_loaders = [ 'WP_Post', 'WP_Post_Media', 'WP_Post_Meta', 'WP_Post_Terms' ];
+			$all_loaders = [ 'WP_Post_Media', 'WP_Post', 'WP_Post_Meta', 'WP_Post_Terms' ];
 
 			if ( $load_operation['loader'] === 'WP_Post_All' ) {
 				$all = true;
