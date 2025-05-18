@@ -260,22 +260,27 @@ final class WPMediaLoader implements Loader
         }
 
         $url = $media_data['url'];
-        $desc = $media_data['title'] ?? null;
+        $desc = $media_data['title'] ?? null; // Used as fallback title by media_handle_sideload
         $post_parent = !empty($media_data['post_parent']) ? (int)$media_data['post_parent'] : 0;
 
-        // Prepare post data for the attachment
-        $post_data = array_filter([
+        // Prepare post data for the attachment (title, content, excerpt)
+        // These will be used by media_handle_sideload or wp_update_post for existing attachments
+        $attachment_post_fields = array_filter([
             'post_title' => $media_data['title'] ?? '',
             'post_content' => $media_data['description'] ?? '',
             'post_excerpt' => $media_data['caption'] ?? '',
-            'post_parent' => $post_parent,
+            // 'post_parent' is handled separately by media_handle_sideload's direct argument
+            // and in findExistingAttachment if we decide to update parent there.
+            // For now, post_parent is primarily for new attachments via media_handle_sideload.
         ]);
 
-        // Download and create the attachment
-        $attachment_id = $this->sideloadMedia($url, $post_parent, $desc, $post_data);
+        // Sideload media, $desc is used by media_handle_sideload as potential title.
+        // $attachment_post_fields provides explicit title, content, excerpt.
+        $attachment_id = $this->sideloadMedia($url, $post_parent, $desc, $attachment_post_fields);
 
         if (is_wp_error($attachment_id)) {
-            throw WPAdapterDatabaseException::fromWPError($attachment_id, "Failed to sideload media");
+            // Ensure the WP_Error from sideloadMedia is converted to an exception
+            throw WPAdapterDatabaseException::fromWPError($attachment_id, "Failed to sideload media from URL: {$url}");
         }
 
         // Update alt text if provided
@@ -283,7 +288,7 @@ final class WPMediaLoader implements Loader
             update_post_meta($attachment_id, '_wp_attachment_image_alt', $media_data['alt_text']);
         }
 
-        // Process any meta fields
+        // Process any custom meta fields
         foreach ($media_data as $key => $value) {
             if (strpos($key, 'meta_') === 0) {
                 $meta_key = substr($key, 5);
@@ -295,69 +300,173 @@ final class WPMediaLoader implements Loader
     }
 
     /**
-     * Sideload media from URL, checking for existing attachments first
+     * Sideload media from URL, checking for existing attachments first.
+     * This method orchestrates the finding of existing attachments or downloading and creating new ones.
      *
      * @param string $url The URL of the media to sideload
-     * @param int $post_parent The parent post ID
-     * @param string|null $desc The description
-     * @param array<string, mixed> $post_data Additional post data
-     * @return int|\WP_Error The attachment ID or WP_Error
+     * @param int $post_parent The parent post ID for new attachments
+     * @param string|null $desc Description, often used as a fallback title for new attachments
+     * @param array<string, mixed> $attachment_post_fields Contains 'post_title', 'post_content', 'post_excerpt' for the attachment
+     * @return int|\WP_Error The attachment ID or WP_Error on failure
      */
-    protected function sideloadMedia(string $url, int $post_parent = 0, ?string $desc = null, array $post_data = []): int|\WP_Error
+    protected function sideloadMedia(string $url, int $post_parent = 0, ?string $desc = null, array $attachment_post_fields = []): int|\WP_Error
     {
-        // Check for existing attachment by filename
-        $filename = pathinfo($url, PATHINFO_FILENAME);
+        $url_path_part = strtok($url, '?');
+        if ($url_path_part === false) {
+            $url_path_part = $url;
+        }
+        $filename_base = pathinfo(wp_basename($url_path_part), PATHINFO_FILENAME);
 
-        // Try up to 3 variations of the filename (original, -1, -2)
+        if (!empty($filename_base)) {
+            $existing_attachment_id = $this->findExistingAttachment($filename_base, $attachment_post_fields);
+            if (null !== $existing_attachment_id) {
+                // update_post_meta($existing_attachment_id, '_source_url', $url);
+                return $existing_attachment_id;
+            }
+        }
+
+        $load_error = $this->ensureMediaFunctionsLoaded();
+        if (is_wp_error($load_error)) {
+            return $load_error;
+        }
+
+        $file_array = $this->downloadFileForSideloading($url);
+        if (is_wp_error($file_array)) {
+            return $file_array;
+        }
+
+        return $this->createAttachmentFromSideloadedFile(
+            $file_array,
+            $post_parent,
+            $desc,
+            $attachment_post_fields,
+            $url
+        );
+    }
+
+    /**
+     * Finds an existing attachment by its filename base.
+     *
+     * @param string $filename_base The base name of the file (without extension).
+     * @param array<string, mixed> $post_data_for_update Data to update the attachment post if found (e.g., title, content).
+     * @return int|null Attachment ID if found, otherwise null.
+     */
+    private function findExistingAttachment(string $filename_base, array $post_data_for_update): ?int
+    {
         for ($i = 0; $i < 3; $i++) {
-            $existing_attachment = get_posts(
-                array(
-                    'post_type'      => 'attachment',
-                    'posts_per_page' => 1,
-                    'title'          => $filename . ($i ? '-' . $i : ''),
-                    'fields'         => 'ids',
-                )
-            );
+            $search_title = $filename_base . ($i ? '-' . $i : '');
+            $query_args = [
+                'post_type'      => 'attachment',
+                'posts_per_page' => 1,
+                'post_status'    => 'inherit',
+                'fields'         => 'ids',
+            ];
 
-            if (!empty($existing_attachment)) {
-                $attachment_id = $existing_attachment[0];
+            $query_args_title = $query_args;
+            $query_args_title['title'] = $search_title;
+            $existing_by_title = get_posts($query_args_title);
 
-                // Update the attachment with any new data if provided
-                if (!empty($post_data)) {
-                    $post_data['ID'] = $attachment_id;
-                    wp_update_post($post_data);
+            if (!empty($existing_by_title)) {
+                $attachment_id = $existing_by_title[0];
+                if (!empty($post_data_for_update)) {
+                    $update_data = $post_data_for_update;
+                    $update_data['ID'] = $attachment_id;
+                    wp_update_post($update_data);
                 }
+                return $attachment_id;
+            }
 
+            $query_args_name = $query_args;
+            $query_args_name['name'] = sanitize_title($search_title);
+            $existing_by_name = get_posts($query_args_name);
+
+            if (!empty($existing_by_name)) {
+                $attachment_id = $existing_by_name[0];
+                if (!empty($post_data_for_update)) {
+                    $update_data = $post_data_for_update;
+                    $update_data['ID'] = $attachment_id;
+                    wp_update_post($update_data);
+                }
                 return $attachment_id;
             }
         }
+        return null;
+    }
 
-        // If no existing attachment found, proceed with sideloading
-        if (!function_exists('media_sideload_image')) {
-            require_once(ABSPATH . 'wp-admin/includes/media.php');
-            require_once(ABSPATH . 'wp-admin/includes/file.php');
-            require_once(ABSPATH . 'wp-admin/includes/image.php');
+    /**
+     * Ensures that necessary WordPress media functions are loaded.
+     *
+     * @return \WP_Error|null Null if successful, WP_Error if critical files cannot be loaded.
+     */
+    private function ensureMediaFunctionsLoaded(): ?\WP_Error
+    {
+        if (!function_exists('download_url') || !function_exists('media_handle_sideload')) {
+            if (!defined('ABSPATH')) {
+                return new \WP_Error('wp_not_loaded', 'WordPress ABSPATH not defined. Cannot load required media files.');
+            }
+            require_once ABSPATH . 'wp-admin/includes/media.php';
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            require_once ABSPATH . 'wp-admin/includes/image.php'; // For wp_generate_attachment_metadata etc.
         }
+        return null;
+    }
 
-        // Use media_sideload_image() with 'id' return type to get attachment ID
-        $attachment_id = media_sideload_image($url, $post_parent, $desc, 'id');
+    /**
+     * Downloads a file from a URL to a temporary location for sideloading.
+     *
+     * @param string $url The URL of the file to download.
+     * @return array|\WP_Error An array with 'name' and 'tmp_name' on success, or WP_Error on failure.
+     */
+    private function downloadFileForSideloading(string $url): array|\WP_Error
+    {
+        $file_array = [];
+        $file_name_from_url = wp_basename(strtok($url, '?') ?: $url);
+
+        if (empty($file_name_from_url) || in_array($file_name_from_url, ['.', '..'], true)) {
+            $url_path_for_ext = parse_url($url, PHP_URL_PATH) ?: '';
+            $path_info_ext = pathinfo($url_path_for_ext, PATHINFO_EXTENSION);
+            $file_name_from_url = 'sideloaded-file-' . substr(md5($url), 0, 8) . ($path_info_ext ? '.' . sanitize_file_name('.' . $path_info_ext) : '');
+        }
+        $file_array['name'] = sanitize_file_name($file_name_from_url);
+
+        $temp_file_path = download_url($url);
+
+        if (is_wp_error($temp_file_path)) {
+            return $temp_file_path; // download_url() handles its own temp file cleanup on error.
+        }
+        $file_array['tmp_name'] = $temp_file_path;
+
+        return $file_array;
+    }
+
+    /**
+     * Creates a WordPress attachment from a sideloaded file.
+     *
+     * @param array $file_array Array containing 'tmp_name' and 'name' of the downloaded file.
+     * @param int $post_parent The parent post ID.
+     * @param string|null $desc A description for the media, used as a fallback title.
+     * @param array<string, mixed> $attachment_post_fields Overrides for attachment post fields (e.g., 'post_title').
+     * @param string $source_url The original URL of the media, stored in post meta.
+     * @return int|\WP_Error The new attachment ID or WP_Error on failure.
+     */
+    private function createAttachmentFromSideloadedFile(
+        array $file_array,
+        int $post_parent,
+        ?string $desc,
+        array $attachment_post_fields,
+        string $source_url
+    ): int|\WP_Error {
+        // $desc is a fallback for title if $attachment_post_fields['post_title'] is not set.
+        $attachment_id = media_handle_sideload($file_array, $post_parent, $desc, $attachment_post_fields);
 
         if (is_wp_error($attachment_id)) {
-            // Check if a temporary file was created and clean it up if necessary
-            $upload_dir = wp_upload_dir();
-            $temp_file = $upload_dir['basedir'] . '/temp_' . md5($url);
-            if (file_exists($temp_file)) {
-                @unlink($temp_file);
-            }
+            // media_handle_sideload() typically unlinks $file_array['tmp_name'] on error.
             return $attachment_id;
         }
 
-        // Update the attachment post with any additional data
-        if (!empty($post_data)) {
-            $post_data['ID'] = $attachment_id;
-            wp_update_post($post_data);
-        }
+        add_post_meta($attachment_id, '_source_url', $source_url);
 
+        // $attachment_post_fields (title, content, excerpt) should have been applied by media_handle_sideload.
         return $attachment_id;
     }
 

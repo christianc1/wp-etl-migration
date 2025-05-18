@@ -107,20 +107,28 @@ final class WPPostsLoader implements Loader
         // Handle post ID if provided (update existing post)
         $postId = $sanitizedData['post.ID'] ?? $sanitizedData['post.id'] ?? null;
 
+		if ( $postId ) {
+			$post = get_post( $postId );
+
+			if ( ! $post instanceof \WP_Post ) {
+				$postId = null;
+			}
+		}
+
         // Prepare post data differently for updates vs new posts
         if (!empty($postId)) {
             // For updates, only include explicitly provided fields
             $postData = array_filter([
                 'ID' => (int) $postId,
-                'post_title' => $sanitizedData['post.post_title'] ?? null,
-                'post_content' => $sanitizedData['post.post_content'] ?? null,
-                'post_excerpt' => $sanitizedData['post.post_excerpt'] ?? null,
-                'post_name' => $sanitizedData['post.post_name'] ?? null,
-                'post_status' => $sanitizedData['post.post_status'] ?? null,
-                'post_type' => $sanitizedData['post.post_type'] ?? null,
-                'post_author' => $sanitizedData['post.post_author'] ?? null,
-                'post_date' => $sanitizedData['post.post_date'] ?? null,
-                'post_date_gmt' => $sanitizedData['post.post_date_gmt'] ?? null,
+                'post_title' => $sanitizedData['post.post_title'] ?? $post->post_title,
+                'post_content' => $sanitizedData['post.post_content'] ?? $post->post_content,
+                'post_excerpt' => $sanitizedData['post.post_excerpt'] ?? $post->post_excerpt,
+                'post_name' => $sanitizedData['post.post_name'] ?? $post->post_name,
+                'post_status' => $sanitizedData['post.post_status'] ?? $post->post_status,
+                'post_type' => $sanitizedData['post.post_type'] ?? $post->post_type,
+                'post_author' => $sanitizedData['post.post_author'] ?? $post->post_author,
+                'post_date' => $sanitizedData['post.post_date'] ?? $post->post_date,
+                'post_date_gmt' => $sanitizedData['post.post_date_gmt'] ?? $post->post_date_gmt,
             ], function($value) { return $value !== null; });
         } else {
             // For new posts, merge with defaults

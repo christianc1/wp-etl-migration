@@ -113,12 +113,19 @@ final class WPPostMetaLoader implements Loader
 
         foreach ($sanitizedData as $key => $value) {
             if (str_starts_with($key, 'meta.')) {
-                $metaKey = sanitize_key(substr($key, 5)); // Remove 'meta.' prefix and sanitize
+                // Parse the meta key to extract mode and actual key
+                $metaParts = explode('.', substr($key, 5)); // Remove 'meta.' prefix
+                $metaKey = sanitize_key($metaParts[0]);
+                $mode = isset($metaParts[1]) ? strtolower($metaParts[1]) : 'update';
 
                 // Sanitize meta value based on type
                 $sanitizedValue = $this->sanitizeMetaValue($value);
 
-                update_post_meta(absint($postId), $metaKey, $sanitizedValue);
+                if ($mode === 'add') {
+                    add_post_meta(absint($postId), $metaKey, $sanitizedValue);
+                } else {
+                    update_post_meta(absint($postId), $metaKey, $sanitizedValue);
+                }
                 $metaUpdated = true;
             }
         }

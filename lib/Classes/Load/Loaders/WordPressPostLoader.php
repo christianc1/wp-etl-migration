@@ -87,7 +87,9 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 					if ( $existing_post ) {
 						$this->log( 'Updating post: ' . $row->valueOf( 'post.post_title' ), 'progress' );
 
-						$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $existing_post ) ) );
+						if ( ! $row->has( 'post.ID' ) ) {
+							$row = $this->mutate_row( $row->add( integer_entry( 'post.ID', $existing_post ) ) );
+						}
 					}
 				}
 
@@ -146,7 +148,7 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 			if ( $post ) {
 				$row = $row->add( string_entry( 'post.post_title', $post->post_title ) );
 			} else {
-				$row = $row->add( string_entry( 'post.post_title', 'New ' . $this->valueOf( 'post.post_type' ) ) );
+				$row = $row->add( string_entry( 'post.post_title', 'New ' . $row->valueOf( 'post.post_type' ) ) );
 			}
 		}
 
@@ -154,7 +156,7 @@ class WordPressPostLoader extends BaseLoader implements Loader, RowMutator {
 			if ( $post ) {
 				$row = $row->add( string_entry( 'post.post_content', $post->post_content ) );
 			} else {
-				$row = $row->add( string_entry( 'post.post_content', 'Empty content for ' . $this->valueOf( 'post.post_type' ) ) );
+				$row = $row->add( string_entry( 'post.post_content', 'Empty content for ' . $row->valueOf( 'post.post_type' ) ) );
 			}
 		}
 
