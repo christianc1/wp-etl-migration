@@ -315,10 +315,10 @@ final class WPMediaLoader implements Loader
         if ($url_path_part === false) {
             $url_path_part = $url;
         }
-        $filename_base = pathinfo(wp_basename($url_path_part), PATHINFO_FILENAME);
+        $filename_with_extension = wp_basename($url_path_part);
 
-        if (!empty($filename_base)) {
-            $existing_attachment_id = $this->findExistingAttachment($filename_base, $attachment_post_fields);
+        if (!empty($filename_with_extension)) {
+            $existing_attachment_id = $this->findExistingAttachment($filename_with_extension, $attachment_post_fields);
             if (null !== $existing_attachment_id) {
                 // update_post_meta($existing_attachment_id, '_source_url', $url);
                 return $existing_attachment_id;
@@ -345,51 +345,83 @@ final class WPMediaLoader implements Loader
     }
 
     /**
-     * Finds an existing attachment by its filename base.
+     * Finds an existing attachment by its filename with extension.
      *
-     * @param string $filename_base The base name of the file (without extension).
+     * @param string $filename_with_extension The full filename including extension.
      * @param array<string, mixed> $post_data_for_update Data to update the attachment post if found (e.g., title, content).
      * @return int|null Attachment ID if found, otherwise null.
      */
-    private function findExistingAttachment(string $filename_base, array $post_data_for_update): ?int
+    private function findExistingAttachment(string $filename_with_extension, array $post_data_for_update): ?int
     {
+        // Extract filename base and extension for variations
+        $filename_base = pathinfo($filename_with_extension, PATHINFO_FILENAME);
+        $extension = pathinfo($filename_with_extension, PATHINFO_EXTENSION);
+
         for ($i = 0; $i < 3; $i++) {
-            $search_title = $filename_base . ($i ? '-' . $i : '');
+            $search_filename = $filename_base . ($i ? '-' . $i : '') . ($extension ? '.' . $extension : '');
+
+            // Search by _wp_attached_file meta field which contains the actual filename
             $query_args = [
                 'post_type'      => 'attachment',
                 'posts_per_page' => 1,
                 'post_status'    => 'inherit',
                 'fields'         => 'ids',
+                'meta_query'     => [
+                    [
+                        'key'     => '_wp_attached_file',
+                        'value'   => $search_filename,
+                        'compare' => 'LIKE'
+                    ]
+                ]
             ];
 
-            $query_args_title = $query_args;
-            $query_args_title['title'] = $search_title;
+            $existing_by_file = get_posts($query_args);
+
+            if (!empty($existing_by_file)) {
+                $attachment_id = $existing_by_file[0];
+
+                // Verify the exact filename match to avoid partial matches
+                $attached_file = get_post_meta($attachment_id, '_wp_attached_file', true);
+                $attached_basename = basename($attached_file);
+
+                if ($attached_basename === $search_filename) {
+                    if (!empty($post_data_for_update)) {
+                        $update_data = $post_data_for_update;
+                        $update_data['ID'] = $attachment_id;
+                        wp_update_post($update_data);
+                    }
+                    return $attachment_id;
+                }
+            }
+
+            // Fallback: search by title, but only if extension matches
+            $search_title = $filename_base . ($i ? '-' . $i : '');
+            $query_args_title = [
+                'post_type'      => 'attachment',
+                'posts_per_page' => 5, // Get more results to check extensions
+                'post_status'    => 'inherit',
+                'fields'         => 'ids',
+                'title'          => $search_title
+            ];
+
             $existing_by_title = get_posts($query_args_title);
 
-            if (!empty($existing_by_title)) {
-                $attachment_id = $existing_by_title[0];
-                if (!empty($post_data_for_update)) {
-                    $update_data = $post_data_for_update;
-                    $update_data['ID'] = $attachment_id;
-                    wp_update_post($update_data);
-                }
-                return $attachment_id;
-            }
+            foreach ($existing_by_title as $attachment_id) {
+                $attached_file = get_post_meta($attachment_id, '_wp_attached_file', true);
+                $attached_extension = pathinfo($attached_file, PATHINFO_EXTENSION);
 
-            $query_args_name = $query_args;
-            $query_args_name['name'] = sanitize_title($search_title);
-            $existing_by_name = get_posts($query_args_name);
-
-            if (!empty($existing_by_name)) {
-                $attachment_id = $existing_by_name[0];
-                if (!empty($post_data_for_update)) {
-                    $update_data = $post_data_for_update;
-                    $update_data['ID'] = $attachment_id;
-                    wp_update_post($update_data);
+                // Only match if extensions are the same
+                if (strtolower($attached_extension) === strtolower($extension)) {
+                    if (!empty($post_data_for_update)) {
+                        $update_data = $post_data_for_update;
+                        $update_data['ID'] = $attachment_id;
+                        wp_update_post($update_data);
+                    }
+                    return $attachment_id;
                 }
-                return $attachment_id;
             }
         }
+
         return null;
     }
 
